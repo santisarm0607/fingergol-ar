@@ -1,24 +1,34 @@
 /* ============================================================
-   Motor del partido: balón, jugadores, paredes, postes y goles.
-   Todo se mide en "unidades de cancha" (160 x 100), no en píxeles,
-   así la misma lógica sirve para la pantalla, la mesa AR y la red.
+   Motor del futbolito.
+   Cada jugador tiene DOS PIES (tus dedos índice y medio).
+   Los pies siguen a la punta de tus dedos y empujan el balón
+   con la velocidad que lleven: un dedo rápido = un zapatazo.
+   Regla: tus pies solo tocan el balón en tu mitad de la cancha
+   (si cruzas la mitad, tus guayos se ven transparentes).
+   Todo se mide en "unidades de cancha" (160 x 100).
    ============================================================ */
 (function () {
   const FG = (window.FG = window.FG || {});
   const { clamp } = FG.util;
 
   const PASO = 1 / 120;          // la física corre a 120 Hz fijos
-  const R_BALON = 3.4;
-  const R_JUGADOR = 7;
-  const R_POSTE = 1.3;
-  const FRICCION = 0.55;         // cuánto frena el balón por segundo
-  const V_MAX_BALON = 270;
-  const V_MAX_JUGADOR = 520;
-  const REBOTE_PARED = 0.8;
-  const REBOTE_JUGADOR = 0.85;
-  const SEGUIR = 32;             // qué tan rápido la ficha sigue a tu dedo
-  const T_CUENTA = 0.75;         // segundos por número en el 3-2-1
-  const T_GOL = 2.3;             // duración del festejo
+  const R_BALON = 4.2;
+  const R_PIE = 3.6;
+  const ALCANCE = 9;             // "radio" del cuerpo, para limitarlo a su mitad
+  const MARGEN_MITAD = 6;        // tus pies pueden pasar un poquito la mitad
+  const R_POSTE = 1.2;
+  const FRICCION = 0.6;
+  const V_MAX_BALON = 300;
+  const V_MAX_PIE = 650;
+  const REBOTE_PARED = 0.78;
+  const REBOTE_PIE = 0.85;
+  const SEGUIR = 40;             // qué tan rápido el pie sigue a tu dedo
+  const T_CUENTA = 0.75;
+  const T_GOL = 2.3;
+
+  function crearPie(x, y, ang) {
+    return { x, y, vx: 0, vy: 0, r: R_PIE, objX: null, objY: null, ang, enJuego: true };
+  }
 
   class Partido {
     constructor(opciones = {}) {
@@ -32,17 +42,20 @@
       this.golesParaGanar = opciones.golesParaGanar || FG.config.GOLES_POR_DEFECTO;
 
       this.balon = { x: this.W / 2, y: this.H / 2, vx: 0, vy: 0, r: R_BALON, giro: 0 };
-      this.jugadores = [0, 1].map((lado) => ({
-        lado,
-        x: lado ? this.W * 0.78 : this.W * 0.22,
-        y: this.H / 2,
-        vx: 0,
-        vy: 0,
-        r: R_JUGADOR,
-        objX: null,
-        objY: null,
-        activo: false
-      }));
+      this.jugadores = [0, 1].map((lado) => {
+        const x = lado ? this.W * 0.78 : this.W * 0.22;
+        const ang = lado ? Math.PI : 0;
+        return {
+          lado,
+          x,
+          y: this.H / 2,
+          r: ALCANCE,
+          ang,
+          activo: false,
+          cuerpoObj: null,
+          pies: [crearPie(x, this.H / 2 - 3.6, ang), crearPie(x, this.H / 2 + 3.6, ang)]
+        };
+      });
       this.postes = [
         [0, this.y1], [0, this.y2],
         [this.W, this.y1], [this.W, this.y2]
@@ -55,7 +68,7 @@
       this.ganador = -1;
       this.eventos = [];
       this.acumulado = 0;
-      this.red = null; // datos recibidos por red (solo el invitado)
+      this.red = null;
     }
 
     /* ---------- eventos para sonidos y efectos ---------- */
@@ -88,24 +101,38 @@
       if (e === 'cuenta') this.cuenta = 4;
     }
 
-    /** Dónde quiere estar el jugador (posición del dedo). null = no hay mano. */
-    fijarObjetivo(i, x, y) {
+    /**
+     * Dónde quieren estar los pies del jugador i.
+     * pies = [{x, y, ang}, {x, y, ang}]  o  null si no se ve la mano.
+     * cuerpo = {x, y, ang} opcional (muñecos de la máquina o del modo práctica).
+     */
+    fijarPies(i, pies, cuerpo) {
       const j = this.jugadores[i];
-      if (x == null) {
+      if (!pies) {
         j.activo = false;
-        j.objX = j.objY = null;
+        j.pies.forEach((p) => (p.objX = p.objY = null));
         return;
       }
       j.activo = true;
-      j.objX = x;
-      j.objY = y;
+      j.cuerpoObj = cuerpo || null;
+      pies.forEach((q, k) => {
+        const p = j.pies[k];
+        p.objX = q.x;
+        p.objY = q.y;
+        if (q.ang != null) p.ang = q.ang;
+      });
     }
 
-    /** Cada jugador solo puede moverse en su mitad de la cancha. */
+    /** El cuerpo de cada jugador se queda en su mitad (lo usan la máquina y los controles sin cámara). */
     limitar(j, x, y) {
       const xMin = j.lado === 0 ? j.r : this.W / 2;
       const xMax = j.lado === 0 ? this.W / 2 : this.W - j.r;
-      return [clamp(x, xMin, xMax), clamp(y, j.r, this.H - j.r)];
+      return [clamp(x, xMin, xMax), clamp(y, j.r * 0.6, this.H - j.r * 0.6)];
+    }
+
+    /** ¿Puede este pie tocar el balón? Solo en su mitad (+ un margen). */
+    pieEnJuego(lado, x) {
+      return lado === 0 ? x <= this.W / 2 + MARGEN_MITAD : x >= this.W / 2 - MARGEN_MITAD;
     }
 
     actualizar(dt) {
@@ -144,24 +171,42 @@
     }
 
     moverJugador(j, dt) {
-      if (j.objX == null) {
-        j.vx = j.vy = 0;
+      for (const p of j.pies) this.moverPie(j, p, dt);
+      if (j.cuerpoObj) {
+        j.x = j.cuerpoObj.x;
+        j.y = j.cuerpoObj.y;
+        if (j.cuerpoObj.ang != null) j.ang = j.cuerpoObj.ang;
+      } else {
+        j.x = (j.pies[0].x + j.pies[1].x) / 2;
+        j.y = (j.pies[0].y + j.pies[1].y) / 2;
+        j.ang = Math.atan2(
+          Math.sin(j.pies[0].ang) + Math.sin(j.pies[1].ang),
+          Math.cos(j.pies[0].ang) + Math.cos(j.pies[1].ang)
+        );
+      }
+    }
+
+    moverPie(j, p, dt) {
+      if (p.objX == null) {
+        p.vx = p.vy = 0;
         return;
       }
-      const [tx, ty] = this.limitar(j, j.objX, j.objY);
+      const tx = clamp(p.objX, p.r, this.W - p.r);
+      const ty = clamp(p.objY, p.r, this.H - p.r);
       const k = 1 - Math.exp(-SEGUIR * dt);
-      let dx = (tx - j.x) * k;
-      let dy = (ty - j.y) * k;
+      let dx = (tx - p.x) * k;
+      let dy = (ty - p.y) * k;
       const d = Math.hypot(dx, dy);
-      const maxD = V_MAX_JUGADOR * dt;
+      const maxD = V_MAX_PIE * dt;
       if (d > maxD) {
         dx *= maxD / d;
         dy *= maxD / d;
       }
-      j.vx = dx / dt;
-      j.vy = dy / dt;
-      j.x += dx;
-      j.y += dy;
+      p.vx = dx / dt;
+      p.vy = dy / dt;
+      p.x += dx;
+      p.y += dy;
+      p.enJuego = this.pieEnJuego(j.lado, p.x);
     }
 
     moverBalon(dt) {
@@ -175,9 +220,12 @@
       b.giro += (Math.hypot(b.vx, b.vy) * dt) / b.r;
 
       if (this.estado === 'jugando') {
-        for (const j of this.jugadores) this.chocarJugador(b, j);
+        for (const j of this.jugadores) {
+          if (!j.activo) continue;
+          for (const p of j.pies) if (p.enJuego && p.objX != null) this.chocarPie(b, p, j.lado);
+        }
       }
-      for (const p of this.postes) this.chocarPoste(b, p);
+      for (const poste of this.postes) this.chocarPoste(b, poste);
       this.paredes(b);
 
       const v = Math.hypot(b.vx, b.vy);
@@ -188,41 +236,39 @@
       if (this.estado === 'jugando') this.revisarGol(b);
     }
 
-    chocarJugador(b, j) {
-      let dx = b.x - j.x;
-      let dy = b.y - j.y;
+    chocarPie(b, p, lado) {
+      let dx = b.x - p.x;
+      let dy = b.y - p.y;
       let d = Math.hypot(dx, dy);
-      const minD = b.r + j.r;
+      const minD = b.r + p.r;
       if (d >= minD) return;
       if (d < 1e-6) {
-        dx = j.lado === 0 ? 1 : -1;
+        dx = lado === 0 ? 1 : -1;
         dy = 0;
         d = 1;
       }
       const nx = dx / d;
       const ny = dy / d;
-      b.x = j.x + nx * minD;
-      b.y = j.y + ny * minD;
-      const rvx = b.vx - j.vx;
-      const rvy = b.vy - j.vy;
-      const vn = rvx * nx + rvy * ny;
+      b.x = p.x + nx * minD;
+      b.y = p.y + ny * minD;
+      const vn = (b.vx - p.vx) * nx + (b.vy - p.vy) * ny;
       if (vn < 0) {
-        b.vx -= (1 + REBOTE_JUGADOR) * vn * nx;
-        b.vy -= (1 + REBOTE_JUGADOR) * vn * ny;
-        this.emitir('patada', { lado: j.lado, fuerza: -vn, x: b.x, y: b.y });
+        b.vx -= (1 + REBOTE_PIE) * vn * nx;
+        b.vy -= (1 + REBOTE_PIE) * vn * ny;
+        this.emitir('patada', { lado, fuerza: -vn, x: b.x, y: b.y });
       }
     }
 
-    chocarPoste(b, p) {
-      const dx = b.x - p[0];
-      const dy = b.y - p[1];
+    chocarPoste(b, poste) {
+      const dx = b.x - poste[0];
+      const dy = b.y - poste[1];
       const d = Math.hypot(dx, dy);
       const minD = b.r + R_POSTE;
       if (d >= minD || d < 1e-6) return;
       const nx = dx / d;
       const ny = dy / d;
-      b.x = p[0] + nx * minD;
-      b.y = p[1] + ny * minD;
+      b.x = poste[0] + nx * minD;
+      b.y = poste[1] + ny * minD;
       const vn = b.vx * nx + b.vy * ny;
       if (vn < 0) {
         b.vx -= (1 + REBOTE_PARED) * vn * nx;
@@ -237,7 +283,6 @@
       const H = this.H;
       const enBoca = b.y > this.y1 && b.y < this.y2;
 
-      // bandas de arriba y abajo
       if (b.y < r) {
         b.y = r;
         if (b.vy < 0) this.rebotar(b, 'vy');
@@ -245,8 +290,6 @@
         b.y = H - r;
         if (b.vy > 0) this.rebotar(b, 'vy');
       }
-
-      // líneas de fondo (izquierda / derecha)
       if (b.x < r && !enBoca) {
         b.x = r;
         if (b.vx < 0) this.rebotar(b, 'vx');
@@ -254,7 +297,6 @@
         b.x = W - r;
         if (b.vx > 0) this.rebotar(b, 'vx');
       }
-
       // dentro de la red
       if (b.x < 0 || b.x > W) {
         const fondo = b.x < 0 ? -this.fondoArco + r : W + this.fondoArco - r;
@@ -294,10 +336,15 @@
     /* ---------- Red: el anfitrión envía, el invitado recibe ---------- */
     estadoRed() {
       const r = (v) => Math.round(v * 10) / 10;
+      const a = (v) => Math.round(v * 100) / 100;
       const b = this.balon;
       return {
         b: [r(b.x), r(b.y), r(b.vx), r(b.vy)],
-        p: this.jugadores.map((j) => [r(j.x), r(j.y), j.activo ? 1 : 0]),
+        p: this.jugadores.map((j) => [
+          r(j.x), r(j.y), a(j.ang), j.activo ? 1 : 0,
+          r(j.pies[0].x), r(j.pies[0].y), a(j.pies[0].ang),
+          r(j.pies[1].x), r(j.pies[1].y), a(j.pies[1].ang)
+        ]),
         m: this.marcador,
         e: this.estado,
         c: this.cuenta,
@@ -309,7 +356,6 @@
 
     aplicarRed(s) {
       if (!this.red) {
-        // primer paquete: colocar todo directo
         this.balon.x = s.b[0];
         this.balon.y = s.b[1];
       }
@@ -330,17 +376,22 @@
       const k = 1 - Math.exp(-14 * dt);
       if (this.red) {
         const edad = Math.min(0.15, (performance.now() - this.red.t) / 1000);
-        const objX = this.red.b[0] + this.red.b[2] * edad;
-        const objY = this.red.b[1] + this.red.b[3] * edad;
-        b.x += (objX - b.x) * k;
-        b.y += (objY - b.y) * k;
+        b.x += (this.red.b[0] + this.red.b[2] * edad - b.x) * k;
+        b.y += (this.red.b[1] + this.red.b[3] * edad - b.y) * k;
         b.giro += (Math.hypot(b.vx, b.vy) * dt) / b.r;
         this.jugadores.forEach((j, i) => {
           if (i === ladoPropio) return;
-          const p = this.red.p[i];
-          j.x += (p[0] - j.x) * k;
-          j.y += (p[1] - j.y) * k;
-          j.activo = !!p[2];
+          const q = this.red.p[i];
+          j.x += (q[0] - j.x) * k;
+          j.y += (q[1] - j.y) * k;
+          j.ang = q[2];
+          j.activo = !!q[3];
+          j.pies.forEach((p, n) => {
+            p.x += (q[4 + n * 3] - p.x) * k;
+            p.y += (q[5 + n * 3] - p.y) * k;
+            p.ang = q[6 + n * 3];
+            p.enJuego = this.pieEnJuego(j.lado, p.x);
+          });
         });
       }
       this.moverJugador(this.jugadores[ladoPropio], dt);
@@ -348,6 +399,6 @@
   }
 
   Partido.R_BALON = R_BALON;
-  Partido.R_JUGADOR = R_JUGADOR;
+  Partido.R_PIE = R_PIE;
   FG.Partido = Partido;
 })();

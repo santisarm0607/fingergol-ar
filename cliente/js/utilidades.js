@@ -103,5 +103,74 @@
 
   U.FiltroEuro = FiltroEuro;
   U.FiltroEuro2D = FiltroEuro2D;
+
+  /** Gira un ángulo hacia otro por el camino más corto, máximo "paso" radianes. */
+  U.girarHacia = (a, b, paso) => {
+    let d = ((b - a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+    if (Math.abs(d) <= paso) return b;
+    return a + Math.sign(d) * paso;
+  };
+
+  /* ---------- Matrices 4x4 (orden por columnas, igual que three.js) ---------- */
+  const M4 = {
+    multiplicar(a, b) {
+      const o = new Array(16);
+      for (let c = 0; c < 4; c++) {
+        for (let r = 0; r < 4; r++) {
+          o[c * 4 + r] =
+            a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
+        }
+      }
+      return o;
+    },
+    /** Aplica la matriz a [x,y,z,w] y devuelve [x,y,z,w]. */
+    aplicar(m, v) {
+      const [x, y, z, w] = v;
+      return [
+        m[0] * x + m[4] * y + m[8] * z + m[12] * w,
+        m[1] * x + m[5] * y + m[9] * z + m[13] * w,
+        m[2] * x + m[6] * y + m[10] * z + m[14] * w,
+        m[3] * x + m[7] * y + m[11] * z + m[15] * w
+      ];
+    },
+    invertir(m) {
+      const [a00, a01, a02, a03, a10, a11, a12, a13, a20, a21, a22, a23, a30, a31, a32, a33] = m;
+      const b00 = a00 * a11 - a01 * a10;
+      const b01 = a00 * a12 - a02 * a10;
+      const b02 = a00 * a13 - a03 * a10;
+      const b03 = a01 * a12 - a02 * a11;
+      const b04 = a01 * a13 - a03 * a11;
+      const b05 = a02 * a13 - a03 * a12;
+      const b06 = a20 * a31 - a21 * a30;
+      const b07 = a20 * a32 - a22 * a30;
+      const b08 = a20 * a33 - a23 * a30;
+      const b09 = a21 * a32 - a22 * a31;
+      const b10 = a21 * a33 - a23 * a31;
+      const b11 = a22 * a33 - a23 * a32;
+      let det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
+      if (!det) return null;
+      det = 1 / det;
+      return [
+        (a11 * b11 - a12 * b10 + a13 * b09) * det,
+        (a02 * b10 - a01 * b11 - a03 * b09) * det,
+        (a31 * b05 - a32 * b04 + a33 * b03) * det,
+        (a22 * b04 - a21 * b05 - a23 * b03) * det,
+        (a12 * b08 - a10 * b11 - a13 * b07) * det,
+        (a00 * b11 - a02 * b08 + a03 * b07) * det,
+        (a32 * b02 - a30 * b05 - a33 * b01) * det,
+        (a20 * b05 - a22 * b02 + a23 * b01) * det,
+        (a10 * b10 - a11 * b08 + a13 * b06) * det,
+        (a01 * b08 - a00 * b10 - a03 * b06) * det,
+        (a30 * b04 - a31 * b02 + a33 * b00) * det,
+        (a21 * b02 - a20 * b04 - a23 * b00) * det,
+        (a11 * b07 - a10 * b09 - a12 * b06) * det,
+        (a00 * b09 - a01 * b07 + a02 * b06) * det,
+        (a31 * b01 - a30 * b03 - a32 * b00) * det,
+        (a20 * b03 - a21 * b01 + a22 * b00) * det
+      ];
+    }
+  };
+  U.M4 = M4;
+
   FG.util = U;
 })();

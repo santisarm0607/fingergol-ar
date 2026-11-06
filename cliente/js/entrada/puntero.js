@@ -1,15 +1,15 @@
 /* ============================================================
-   Controles sin cámara:
-   - Táctil: cada dedo en la pantalla es un jugador (2 en un celular/tablet)
-   - Mouse: mueve el mouse sobre la cancha
-   - Teclado: J1 = W A S D · J2 = flechas
+   Controles del modo práctica (sin cámara):
+   - Táctil: arrastra tu muñeco; cada toque nuevo es una patada
+   - Mouse: mueve el muñeco con el mouse, clic = patada
+   - Teclado: J1 = W A S D + Espacio · J2 = flechas + Enter
    ============================================================ */
 (function () {
   const FG = (window.FG = window.FG || {});
 
   const TECLAS = [
-    { arriba: 'KeyW', abajo: 'KeyS', izq: 'KeyA', der: 'KeyD' },
-    { arriba: 'ArrowUp', abajo: 'ArrowDown', izq: 'ArrowLeft', der: 'ArrowRight' }
+    { arriba: 'KeyW', abajo: 'KeyS', izq: 'KeyA', der: 'KeyD', patada: ['Space'] },
+    { arriba: 'ArrowUp', abajo: 'ArrowDown', izq: 'ArrowLeft', der: 'ArrowRight', patada: ['Enter', 'NumpadEnter', 'ShiftRight'] }
   ];
   const VEL_TECLADO = 120; // unidades de cancha por segundo
 
@@ -19,35 +19,51 @@
       this.punteros = new Map();
       this.teclas = new Set();
       this.virtual = [null, null];
+      this.patadaTeclado = [false, false];
       this.rotado = () => false;
 
-      const registrar = (e) => {
-        this.punteros.set(e.pointerId, { sx: e.clientX, sy: e.clientY, tipo: e.pointerType });
+      const registrar = (e, patear) => {
+        const previo = this.punteros.get(e.pointerId);
+        this.punteros.set(e.pointerId, {
+          sx: e.clientX,
+          sy: e.clientY,
+          tipo: e.pointerType,
+          patear: patear || (previo && previo.patear) || false
+        });
       };
       const quitar = (e) => {
         if (e.pointerType !== 'mouse') this.punteros.delete(e.pointerId);
       };
       elemento.addEventListener('pointerdown', (e) => {
-        registrar(e);
+        registrar(e, true);
         try { elemento.setPointerCapture(e.pointerId); } catch (err) { /* nada */ }
       });
-      elemento.addEventListener('pointermove', registrar);
+      elemento.addEventListener('pointermove', (e) => registrar(e, false));
       elemento.addEventListener('pointerup', quitar);
       elemento.addEventListener('pointercancel', quitar);
 
       window.addEventListener('keydown', (e) => {
-        if (TECLAS.some((t) => Object.values(t).includes(e.code))) {
+        TECLAS.forEach((t, lado) => {
+          if (t.patada.includes(e.code) && !e.repeat) this.patadaTeclado[lado] = true;
+        });
+        const usada = TECLAS.some((t) => [t.arriba, t.abajo, t.izq, t.der, ...t.patada].includes(e.code));
+        if (usada) {
           this.teclas.add(e.code);
-          if (e.code.startsWith('Arrow')) e.preventDefault();
+          if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
         }
       });
       window.addEventListener('keyup', (e) => this.teclas.delete(e.code));
       window.addEventListener('blur', () => this.teclas.clear());
     }
 
-    /** Punteros activos en coordenadas de pantalla. */
+    /** Punteros activos en coordenadas de pantalla. "patear" se consume al leer. */
     lista() {
-      return Array.from(this.punteros.values());
+      const salida = [];
+      for (const p of this.punteros.values()) {
+        salida.push({ sx: p.sx, sy: p.sy, tipo: p.tipo, patear: p.patear });
+        p.patear = false;
+      }
+      return salida;
     }
 
     /** Posiciones de los jugadores que se mueven con teclado (en coordenadas de cancha). */
@@ -66,7 +82,9 @@
           dx = -dy;
           dy = tmp;
         }
-        if (!dx && !dy && !this.virtual[lado]) return;
+        const patear = this.patadaTeclado[lado];
+        this.patadaTeclado[lado] = false;
+        if (!dx && !dy && !patear && !this.virtual[lado]) return;
         const j = partido.jugadores[lado];
         if (!this.virtual[lado]) this.virtual[lado] = { x: j.x, y: j.y };
         const v = this.virtual[lado];
@@ -76,13 +94,14 @@
         const [cx, cy] = partido.limitar(j, v.x, v.y);
         v.x = cx;
         v.y = cy;
-        salida.push({ x: v.x, y: v.y, lado, tipo: 'teclado' });
+        salida.push({ x: v.x, y: v.y, lado, tipo: 'teclado', patear });
       });
       return salida;
     }
 
     reiniciar() {
       this.virtual = [null, null];
+      this.patadaTeclado = [false, false];
       this.teclas.clear();
       for (const [id, p] of this.punteros) if (p.tipo !== 'mouse') this.punteros.delete(id);
     }

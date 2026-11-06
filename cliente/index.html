@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <meta name="theme-color" content="#070b1a">
-  <meta name="description" content="FingerGol AR: fútbol con los dedos en realidad aumentada. Juega con tu mano frente a la cámara.">
-  <title>FingerGol AR — fútbol con los dedos</title>
+  <meta name="description" content="FingerGol AR: futbolito 3D en realidad aumentada. Tus dedos índice y medio son las piernas de tu jugador.">
+  <title>FingerGol AR — futbolito 3D con los dedos</title>
   <link rel="icon" href="assets/icono.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,9 +14,8 @@
 </head>
 <body>
 
-  <!-- ================= ESCENARIO (cámara + cancha) ================= -->
+  <!-- ================= ESCENARIO (AR.js + futbolito 3D) ================= -->
   <div id="escenario">
-    <video id="video" playsinline muted autoplay></video>
     <div id="contenedor-ar"></div>
     <canvas id="lienzo"></canvas>
   </div>
@@ -42,9 +41,10 @@
   </div>
   <div id="mensaje-central" class="oculto" aria-live="assertive"></div>
   <div id="aviso" class="oculto" role="status"></div>
+  <div id="aviso-girar">📱↻ Gira el celular (horizontal) para ver todo el futbolito</div>
   <div id="banner-demo" class="oculto">
-    Vista previa en Claude: aquí se juega con <b>mouse, táctil o teclado</b>.
-    Para jugar con las <b>manos</b> ejecuta el proyecto (mira el README).
+    Vista previa en Claude: aquí se juega el <b>modo práctica</b> (mouse, táctil o teclado).
+    Para jugar con tus <b>dedos sobre la mesa</b> ejecuta el proyecto (mira el README).
   </div>
 
   <!-- ================= INICIO ================= -->
@@ -57,19 +57,19 @@
           <path d="M32 19V5M44 28l13-5M39.5 42l8 11M24.5 42l-8 11M20 28L7 23" stroke="#1b2233" stroke-width="3" fill="none"/>
         </svg>
         <h1>Finger<span>Gol</span> <em>AR</em></h1>
-        <p class="lema">Fútbol con los dedos, en realidad aumentada</p>
+        <p class="lema">Futbolito 3D en tu mesa: tus dedos son las piernas</p>
       </header>
 
       <ol class="como-jugar" aria-label="Cómo se juega">
-        <li><b>☝️</b><span>Muestra tu dedo índice a la cámara</span></li>
-        <li><b>⚽</b><span>Empuja el balón con tu ficha</span></li>
-        <li><b>🥅</b><span>Mete gol en el arco rival</span></li>
+        <li><b>🧾</b><span>Pon el marcador sobre la mesa</span></li>
+        <li><b>✌️</b><span>Índice y medio son tus piernas</span></li>
+        <li><b>⚽</b><span>Patea al arco rival</span></li>
       </ol>
 
       <div class="modos">
         <button class="modo destacado" data-modo="local">
           <span class="ico">👥</span>
-          <span class="txt"><span class="tit">2 jugadores</span><span class="sub">Misma pantalla · una mano cada uno</span></span>
+          <span class="txt"><span class="tit">2 jugadores</span><span class="sub">Misma mesa · una mano cada uno</span></span>
           <span class="flecha">›</span>
         </button>
         <button class="modo" data-modo="cpu">
@@ -79,7 +79,7 @@
         </button>
         <button class="modo" data-modo="online">
           <span class="ico">🌐</span>
-          <span class="txt"><span class="tit">En línea</span><span class="sub" id="sub-online">Con un amigo en otro dispositivo</span></span>
+          <span class="txt"><span class="tit">En línea</span><span class="sub" id="sub-online">Cada uno en su mesa, con código de sala</span></span>
           <span class="flecha">›</span>
         </button>
       </div>
@@ -87,20 +87,13 @@
       <details class="ajustes" id="ajustes">
         <summary><span>⚙️ Ajustes</span> <span class="resumen" id="resumen-ajustes"></span></summary>
         <div class="fila">
-          <span class="etq">Control</span>
+          <span class="etq">Cómo jugar</span>
           <div class="segmentos" data-ajuste="control">
-            <button data-valor="manos">✋ Manos (cámara)</button>
-            <button data-valor="tactil">👆 Táctil / mouse</button>
+            <button data-valor="manos">✌️ Dedos en la mesa (AR)</button>
+            <button data-valor="tactil">👆 Práctica sin cámara</button>
           </div>
         </div>
-        <div class="fila" id="fila-vista">
-          <span class="etq">Vista AR</span>
-          <div class="segmentos" data-ajuste="vista">
-            <button data-valor="pantalla">📺 Pantalla</button>
-            <button data-valor="mesa">🧾 Mesa (marcador)</button>
-          </div>
-        </div>
-        <p class="nota" id="nota-mesa">Modo Mesa: imprime el <button class="enlace" id="btn-ver-marcador">marcador Hiro</button>, ponlo sobre la mesa y deja el celular quieto apuntándolo.</p>
+        <p class="nota" id="nota-mesa">Necesitas el <button class="enlace" data-ver-marcador>marcador Hiro</button> impreso (o en otra pantalla) sobre la mesa.</p>
         <div class="fila">
           <span class="etq">Goles para ganar</span>
           <div class="segmentos" data-ajuste="goles">
@@ -117,19 +110,48 @@
             <button data-valor="dificil">Difícil</button>
           </div>
         </div>
-        <p class="nota">Sin cámara: Jugador 1 usa <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> y Jugador 2 las <kbd>flechas</kbd>, o toquen la pantalla con un dedo cada uno.</p>
+        <p class="nota">Práctica: mueve tu muñeco con el mouse o el dedo y <b>clic/toque = patada</b>.
+          Teclado: J1 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> + <kbd>Espacio</kbd> · J2 <kbd>flechas</kbd> + <kbd>Enter</kbd>.</p>
       </details>
 
-      <footer class="pie">Hecho por <b>SantiSarm</b> · MediaPipe + AR.js</footer>
+      <footer class="pie">Hecho por <b>SantiSarm</b> · AR.js + MediaPipe</footer>
+    </div>
+  </section>
+
+  <!-- ================= GUÍA: armar el futbolito ================= -->
+  <section id="p-guia" class="pantalla">
+    <div class="tarjeta">
+      <button class="btn-volver" data-menu>← Volver</button>
+      <h2>🧾 Arma tu futbolito</h2>
+      <svg class="dibujo-guia" viewBox="0 0 320 150" aria-hidden="true">
+        <polygon points="20,140 300,140 260,62 60,62" fill="#6b4226"/>
+        <polygon points="70,128 250,128 225,74 95,74" fill="#2a9d5a" opacity="0.55" stroke="#fff" stroke-dasharray="4 3"/>
+        <polygon points="138,110 182,110 176,90 144,90" fill="#fff" stroke="#111" stroke-width="3"/>
+        <text x="160" y="104" font-size="9" font-weight="800" text-anchor="middle" fill="#111">Hiro</text>
+        <rect x="140" y="6" width="40" height="26" rx="5" fill="#1b2233" stroke="#9fb0d9" stroke-width="2"/>
+        <circle cx="160" cy="27" r="3" fill="#2ec5ff"/>
+        <path d="M160 30 L95 74 M160 30 L225 74" stroke="#ffd23f" stroke-width="1.5" stroke-dasharray="4 3" fill="none"/>
+        <text x="200" y="22" font-size="11" fill="#d6def5">📱 quieto</text>
+        <text x="74" y="122" font-size="22">✌️</text>
+        <text x="222" y="122" font-size="22">✌️</text>
+      </svg>
+      <ol class="guia">
+        <li><span class="num">1</span><div><b>Ten el marcador Hiro</b><small>Imprímelo de unos 10 cm o ábrelo en otra pantalla. <button class="enlace" data-ver-marcador>Ver marcador</button></small></div></li>
+        <li><span class="num">2</span><div><b>Ponlo plano sobre la mesa</b><small>Con buena luz y sin reflejos. El futbolito aparecerá encima.</small></div></li>
+        <li><span class="num">3</span><div><b>Celular quieto mirando la mesa</b><small>Apóyalo en un vaso o soporte, que se vea el marcador completo y espacio alrededor.</small></div></li>
+        <li><span class="num">4</span><div><b>Tu mano es el jugador ✌️</b><small>Apoya el índice y el medio en la mesa como dos piernas, camina y patea el balón.</small></div></li>
+      </ol>
+      <label class="check"><input type="checkbox" id="chk-guia"> No volver a mostrar esta guía</label>
+      <button id="btn-guia-ok" class="btn grande">📷 ¡Listo, abrir la cámara!</button>
     </div>
   </section>
 
   <!-- ================= EN LÍNEA ================= -->
   <section id="p-online" class="pantalla">
     <div class="tarjeta">
-      <button class="btn-volver" data-volver>← Volver</button>
+      <button class="btn-volver" data-menu>← Volver</button>
       <h2>🌐 Jugar en línea</h2>
-      <p class="sub-tarjeta">Cada uno juega desde su propio dispositivo con su cámara.</p>
+      <p class="sub-tarjeta">Cada uno juega en su propia mesa, con su marcador y su celular.</p>
       <div id="online-opciones">
         <button id="btn-crear" class="btn grande">➕ Crear sala</button>
         <div class="separador"><span>o únete con un código</span></div>
@@ -148,14 +170,14 @@
     </div>
   </section>
 
-  <!-- ================= CARGA (cámara + detector) ================= -->
+  <!-- ================= CARGA ================= -->
   <section id="p-carga" class="pantalla">
     <div class="tarjeta centro">
       <div class="spinner" id="carga-spinner"></div>
-      <h2 id="carga-titulo">Preparando el juego…</h2>
+      <h2 id="carga-titulo">Preparando el futbolito…</h2>
       <ul class="pasos">
-        <li id="paso-ar" class="oculto"><span class="ic"></span><span><b>Cargar AR.js</b><small>Realidad aumentada para la mesa</small></span></li>
-        <li id="paso-camara"><span class="ic"></span><span><b>Encender la cámara</b><small>Pulsa “Permitir” si el navegador lo pregunta</small></span></li>
+        <li id="paso-camara"><span class="ic"></span><span><b>Permiso de la cámara</b><small>Pulsa “Permitir” si el navegador lo pregunta</small></span></li>
+        <li id="paso-ar"><span class="ic"></span><span><b>Cargar AR.js</b><small>Para ver el futbolito sobre la mesa</small></span></li>
         <li id="paso-modelo"><span class="ic"></span><span><b>Cargar el detector de manos</b><small>La primera vez tarda unos segundos</small></span></li>
       </ul>
       <div id="carga-error" class="oculto">
@@ -169,26 +191,26 @@
     </div>
   </section>
 
-  <!-- ================= LOBBY: muestra tu mano ================= -->
+  <!-- ================= LOBBY: pon tu mano ================= -->
   <section id="p-lobby" class="capa">
     <div class="lobby-lados">
       <div class="lado lado0" id="lado0">
-        <div class="mano-anim">☝️</div>
+        <div class="mano-anim">✌️</div>
         <b class="lado-nombre" id="lado0-nombre">Jugador 1</b>
-        <span class="lado-estado" id="lado0-estado">Pon tu mano de este lado</span>
+        <span class="lado-estado" id="lado0-estado">Pon tus dedos de este lado</span>
         <div class="barra"><i id="lado0-barra"></i></div>
       </div>
       <div class="lado lado1" id="lado1">
-        <div class="mano-anim">☝️</div>
+        <div class="mano-anim">✌️</div>
         <b class="lado-nombre" id="lado1-nombre">Jugador 2</b>
-        <span class="lado-estado" id="lado1-estado">Pon tu mano de este lado</span>
+        <span class="lado-estado" id="lado1-estado">Pon tus dedos de este lado</span>
         <div class="barra"><i id="lado1-barra"></i></div>
       </div>
     </div>
     <div class="lobby-centro">
-      <h2 id="lobby-titulo">¡Muestra tu mano! ✋</h2>
-      <p id="lobby-sub">Apunta con el dedo índice. Tu ficha seguirá a tu dedo.</p>
-      <p class="lobby-tip">💡 Buena luz y la mano a 40–70 cm de la cámara</p>
+      <h2 id="lobby-titulo">🧾 Apunta la cámara al marcador</h2>
+      <p id="lobby-sub">Cuando aparezca el futbolito, deja el celular quieto.</p>
+      <p class="lobby-tip">💡 Si tapas el marcador con la mano, el futbolito se queda en su sitio</p>
       <button id="btn-empezar-ya" class="btn sec">Empezar ya ▶</button>
     </div>
   </section>
@@ -247,8 +269,8 @@
     <div class="tarjeta centro">
       <h2>🧾 Marcador Hiro</h2>
       <img id="img-hiro" alt="Marcador Hiro de AR.js" width="220" height="220">
-      <p class="sub-tarjeta">Imprímelo (unos 8–10 cm, con borde blanco) o ábrelo en otra pantalla.
-        <a id="link-hiro" target="_blank" rel="noopener">Abrir imagen</a></p>
+      <p class="sub-tarjeta">Imprímelo de unos 10 cm, con el borde blanco alrededor, o muéstralo en otra pantalla.
+        <a id="link-hiro" target="_blank" rel="noopener">Abrir imagen para imprimir</a></p>
       <button class="btn" id="btn-cerrar-marcador">Listo</button>
     </div>
   </section>
@@ -258,11 +280,13 @@
   <script src="js/utilidades.js"></script>
   <script src="js/audio/sonidos.js"></script>
   <script src="js/juego/fisica.js"></script>
+  <script src="js/juego/andador.js"></script>
   <script src="js/juego/cpu.js"></script>
   <script src="js/entrada/camara.js"></script>
   <script src="js/entrada/hand-tracker.js"></script>
   <script src="js/entrada/puntero.js"></script>
-  <script src="js/render/render-pantalla.js"></script>
+  <script src="js/render/camara-virtual.js"></script>
+  <script src="js/render/render-3d.js"></script>
   <script src="js/render/render-ar.js"></script>
   <script src="js/red/red.js"></script>
   <script src="js/app.js"></script>

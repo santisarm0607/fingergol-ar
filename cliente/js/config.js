@@ -21,7 +21,7 @@ FG.config = {
   MODELO_MANO:
     'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
 
-  // --- AR.js + A-Frame (solo para el "Modo Mesa" con marcador) ---
+  // --- AR.js + A-Frame (seguimiento del marcador sobre la mesa) ---
   AFRAME_URLS: [
     'https://aframe.io/releases/1.6.0/aframe.min.js',
     'https://cdn.jsdelivr.net/gh/aframevr/aframe@1.6.0/dist/aframe-master.min.js'
@@ -30,7 +30,11 @@ FG.config = {
     'https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js',
     'https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@master/aframe/build/aframe-ar.js'
   ],
-  MARCADOR_HIRO: 'https://upload.wikimedia.org/wikipedia/commons/4/48/Hiro_marker_ARjs.png',
+  // Imagen del marcador Hiro para imprimir (dos copias por si una falla)
+  MARCADOR_HIRO: [
+    'https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/hiro.png',
+    'https://upload.wikimedia.org/wikipedia/commons/4/48/Hiro_marker_ARjs.png'
+  ],
 
   // --- Servidor en línea ------------------------------------
   // null = usa el mismo servidor que entrega la página (lo normal).
@@ -38,13 +42,18 @@ FG.config = {
   // 'wss://mi-fingergol.onrender.com/ws'
   SERVIDOR_URL: null,
 
-  // --- Cancha (unidades del juego, no píxeles) ---------------
+  // --- Futbolito (unidades del juego: 1 unidad ≈ 2 mm con marcador de 10 cm) ---
   CANCHA: {
-    ancho: 160,     // largo de la cancha (de arco a arco)
-    alto: 100,      // ancho de la cancha
-    arco: 34,       // tamaño de la boca del arco
-    fondoArco: 7    // profundidad de la red
+    ancho: 160,      // largo (de arco a arco)
+    alto: 100,       // ancho
+    arco: 34,        // boca del arco
+    fondoArco: 8,    // profundidad de la red
+    alturaArco: 12,  // altura del travesaño
+    banda: 3         // altura de las paredes de madera
   },
+  // Tamaño de la cancha respecto al marcador (1 = lado del marcador).
+  // 0.02 → la cancha mide 3.2 x 2 marcadores.
+  ESCALA_AR: 0.02,
 
   EQUIPOS: [
     { color: '#2ec5ff', oscuro: '#0b6e9c', nombre: 'AZUL' },

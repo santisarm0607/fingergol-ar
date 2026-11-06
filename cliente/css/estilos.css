@@ -67,17 +67,6 @@ kbd {
     radial-gradient(ellipse 80% 60% at 50% 110%, rgba(40, 200, 120, 0.18), transparent 70%),
     var(--fondo);
 }
-#video {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transform: scaleX(-1); /* espejo: te ves como en un espejo */
-  filter: brightness(0.82) saturate(0.9);
-  display: none;
-}
-body.con-camara #video { display: block; }
 #lienzo {
   position: absolute;
   inset: 0;
@@ -87,7 +76,8 @@ body.con-camara #video { display: block; }
 body.modo-ar #contenedor-ar { display: block; }
 body.modo-ar #escenario { background: transparent; }
 body.modo-ar #lienzo { pointer-events: none; }
-body.modo-ar { background: #000; }
+/* el video de AR.js va detrás de todo (z-index negativo): el body no debe taparlo */
+body.modo-ar { background: transparent; }
 
 /* ================= HUD ================= */
 #hud {
@@ -539,65 +529,67 @@ body.modo-ar { background: #000; }
 .pasos li[data-estado='fallo'] .ic::after { content: '✕'; }
 
 /* ================= LOBBY ================= */
-.capa { position: fixed; inset: 0; z-index: 15; display: none; pointer-events: none; }
-.capa.activa { display: block; }
-.lobby-lados {
-  position: absolute;
-  inset: 66px 0 0 0;
-  display: flex;
-  gap: 10px;
-  padding: 10px;
-}
-.lado {
-  flex: 1;
-  display: flex;
+.capa {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  display: none;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
-  padding: 18px 12px 22px;
-  border-radius: 26px;
-  border: 3px dashed rgba(255, 255, 255, 0.45);
-  background: rgba(255, 255, 255, 0.03);
-  text-align: center;
+  gap: 8px;
+  padding: 72px 12px 0;
+  pointer-events: none;
+}
+.capa.activa { display: flex; }
+.lobby-lados {
+  order: 2;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+}
+.lado {
+  flex: 0 1 280px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto auto;
+  column-gap: 10px;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 18px;
+  border: 2px dashed rgba(255, 255, 255, 0.45);
+  background: rgba(8, 12, 28, 0.82);
   transition: background 0.25s, border-color 0.25s;
 }
-.lado0 { border-color: rgba(46, 197, 255, 0.75); }
-.lado1 { border-color: rgba(255, 77, 109, 0.75); }
-.lado .mano-anim { font-size: 54px; animation: saludar 1.4s ease-in-out infinite; }
-.lado-nombre { font-size: 24px; }
+.lado0 { border-color: rgba(46, 197, 255, 0.8); }
+.lado1 { border-color: rgba(255, 77, 109, 0.8); }
+.lado .mano-anim { grid-row: 1 / span 3; font-size: 36px; animation: saludar 1.4s ease-in-out infinite; }
+.lado-nombre { font-size: 19px; line-height: 1.1; }
 .lado0 .lado-nombre { color: var(--azul); }
 .lado1 .lado-nombre { color: var(--rojo); }
-.lado-estado {
-  font-size: 16px;
-  padding: 2px 12px;
-  border-radius: 999px;
-  background: rgba(8, 12, 28, 0.75);
-}
+.lado-estado { font-size: 14px; color: #d6def5; line-height: 1.25; }
 .barra {
-  width: min(220px, 80%);
-  height: 8px;
-  margin-top: 6px;
+  width: 100%;
+  height: 7px;
+  margin-top: 5px;
   border-radius: 99px;
   background: rgba(255, 255, 255, 0.15);
   overflow: hidden;
 }
 .barra i { display: block; height: 100%; width: 0; border-radius: 99px; background: var(--verde); transition: width 0.1s linear; }
 .lado.detectado { border-style: solid; }
-.lado0.detectado { background: rgba(46, 197, 255, 0.1); }
-.lado1.detectado { background: rgba(255, 77, 109, 0.1); }
+.lado0.detectado { background: rgba(11, 60, 90, 0.88); }
+.lado1.detectado { background: rgba(90, 16, 34, 0.88); }
 .lado.listo .mano-anim { animation: none; }
-.lado.listo .mano-anim::after { content: ' ✅'; font-size: 0.6em; }
-.lado.remoto { border-style: solid; opacity: 0.75; }
+.lado.listo .mano-anim::after { content: '✅'; font-size: 0.5em; vertical-align: top; }
+.lado.remoto { border-style: solid; opacity: 0.8; }
 .lado.remoto .mano-anim { animation: none; opacity: 0.6; }
-@keyframes saludar { 50% { transform: translateY(-8px) rotate(-8deg); } }
+body.lobby-marcador .lobby-lados { opacity: 0.55; }
+@keyframes saludar { 50% { transform: translateY(-5px) rotate(-8deg); } }
 
 .lobby-centro {
-  position: absolute;
-  left: 50%;
-  top: 76px;
-  transform: translateX(-50%);
-  width: min(460px, calc(100% - 24px));
+  order: 1;
+  width: min(460px, 100%);
   padding: 14px 18px;
   border-radius: 20px;
   background: rgba(8, 12, 28, 0.86);
@@ -606,16 +598,40 @@ body.modo-ar { background: #000; }
   pointer-events: auto;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
 }
-.lobby-centro h2 { margin: 0; font-size: 26px; line-height: 1.15; }
+.lobby-centro h2 { margin: 0; font-size: 25px; line-height: 1.15; }
 .lobby-centro p { margin: 4px 0; color: #d6def5; font-size: 16px; }
 .lobby-centro .lobby-tip { color: var(--sub); font-size: 14px; }
 .lobby-centro .btn { margin-top: 8px; font-size: 16px; padding: 8px 18px; }
 .capa.sin-lados .lobby-lados { display: none; }
-.capa.sin-lados .lobby-centro { top: 50%; transform: translate(-50%, -50%); }
+.capa.sin-lados { justify-content: center; padding-top: 0; }
+.capa.sin-lados .lobby-tip { display: none; }
 
-body.vertical .lobby-lados { flex-direction: column-reverse; }
-body.vertical .lado { justify-content: center; }
-body.vertical .lobby-centro { top: 50%; transform: translate(-50%, -50%); }
+/* ================= GUÍA ================= */
+.dibujo-guia { display: block; width: 100%; max-width: 360px; margin: 4px auto 6px; }
+.guia { list-style: none; padding: 0; margin: 6px 0 12px; display: grid; gap: 8px; }
+.guia li {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--panel-claro);
+}
+.guia .num {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  background: var(--amarillo);
+  color: #1b1400;
+}
+.guia b { display: block; font-size: 17px; line-height: 1.2; }
+.guia small { display: block; color: var(--sub); font-size: 14px; line-height: 1.35; }
+.check { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; color: var(--sub); font-size: 15px; cursor: pointer; }
+.check input { width: 18px; height: 18px; accent-color: var(--azul); }
 
 /* ================= FIN ================= */
 .trofeo { font-size: 70px; line-height: 1; animation: rebotar 1s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
@@ -664,6 +680,26 @@ body.vertical .lobby-centro { top: 50%; transform: translate(-50%, -50%); }
 body.en-juego #banner-demo { display: none; }
 body.demo #p-inicio { padding-bottom: 60px; }
 
+#aviso-girar {
+  display: none;
+  position: fixed;
+  left: 50%;
+  bottom: 14px;
+  z-index: 26;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 24px);
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(255, 210, 63, 0.95);
+  color: #1b1400;
+  font-weight: 700;
+  font-size: 15px;
+  text-align: center;
+  pointer-events: none;
+}
+body.modo-ar.vertical.en-juego #aviso-girar { display: block; }
+
 /* ================= RESPONSIVE ================= */
 @media (max-width: 420px) {
   .tarjeta { padding: 16px; }
@@ -672,6 +708,15 @@ body.demo #p-inicio { padding-bottom: 60px; }
   .modo .tit { font-size: 19px; }
   #marcador .nombre { display: none; }
   .codigo { font-size: 50px; }
+}
+@media (max-width: 480px) {
+  .lado { padding: 6px 10px; column-gap: 6px; }
+  .lado .mano-anim { font-size: 24px; }
+  .lado-nombre { font-size: 16px; }
+  .lado-estado { font-size: 12px; }
+  .lobby-centro h2 { font-size: 21px; }
+  .lobby-centro p { font-size: 14px; }
+  .lobby-centro .lobby-tip { display: none; }
 }
 /* celular acostado: menú en dos columnas */
 @media (max-height: 520px) and (orientation: landscape) {
@@ -687,9 +732,10 @@ body.demo #p-inicio { padding-bottom: 60px; }
   .tarjeta-inicio .modos { grid-row: 1 / span 2; }
   .tarjeta-inicio .ajustes { grid-row: 3 / span 2; margin-top: 10px; }
   .logo-balon { width: 40px; height: 40px; }
-  .lado .mano-anim { font-size: 38px; }
-  .lado-nombre { font-size: 19px; }
-  .lobby-centro { top: 64px; padding: 8px 14px; }
+  .lado .mano-anim { font-size: 28px; }
+  .lado { padding: 6px 10px; }
+  .capa { padding-top: 62px; gap: 6px; }
+  .lobby-centro { padding: 8px 14px; }
   .lobby-centro h2 { font-size: 21px; }
   .lobby-centro .lobby-tip { display: none; }
 }

@@ -1,8 +1,9 @@
 /* ============================================================
    App principal: une todo.
-   menú → (cámara + detector) → "muestra tu mano" → partido → fin
-   Cada cuadro: leer manos/toques → asignar a jugadores →
-   física (o red) → sonidos/efectos → dibujar.
+   menú → guía del marcador → AR.js + detector de manos →
+   "pon tu mano como piernas" → partido → fin
+   Cada cuadro: leer dedos/toques → asignar a jugadores →
+   física (o red) → sonidos/efectos → dibujar el futbolito 3D.
    ============================================================ */
 (function () {
   const FG = window.FG;
@@ -10,7 +11,7 @@
   const U = FG.util;
   const { $, $$ } = U;
   const W = C.CANCHA.ancho;
-  const LISTO_SEG = 0.8; // segundos con la mano visible para estar "listo"
+  const LISTO_SEG = 0.8; // segundos con la mano puesta para estar "listo"
 
   const MENSAJES_ERROR = {
     inseguro:
@@ -29,11 +30,10 @@
   const App = {
     ajustes: {
       control: U.leer('control', 'manos'),
-      vista: U.leer('vista', 'pantalla'),
       goles: U.leer('goles', C.GOLES_POR_DEFECTO),
       dificultad: U.leer('dificultad', 'normal')
     },
-    fase: 'menu', // menu | carga | lobby | juego | pausa | fin | alerta
+    fase: 'menu', // menu | guia | carga | lobby | juego | pausa | fin | alerta
     modo: null,   // local | cpu | online
     rol: null,    // anfitrion | invitado (solo en línea)
     partido: null,
@@ -49,14 +49,12 @@
 
     /* ====================== ARRANQUE ====================== */
     iniciar() {
-      this.video = $('#video');
       this.lienzo = $('#lienzo');
-      this.renderer = new FG.RenderPantalla(this.lienzo, this.video);
+      this.renderer = new FG.Render3D(this.lienzo);
       this.puntero = new FG.Puntero(this.lienzo);
       this.puntero.rotado = () => this.renderer.rotado;
       this.sonidos = new FG.Sonidos();
       this.tracker = new FG.HandTracker();
-      this.videoActivo = this.video;
 
       if (C.MODO_DEMO) {
         this.ajustes.control = 'tactil';
@@ -91,15 +89,28 @@
       });
 
       $$('[data-menu]').forEach((b) => b.addEventListener('click', () => this.irAlMenu()));
-      $$('[data-volver]').forEach((b) => b.addEventListener('click', () => this.irAlMenu()));
-
-      $('#btn-ver-marcador').addEventListener('click', (e) => {
-        e.preventDefault();
-        $('#img-hiro').src = C.MARCADOR_HIRO;
-        $('#link-hiro').href = C.MARCADOR_HIRO;
-        this.mostrar('p-marcador');
+      $$('[data-ver-marcador]').forEach((b) =>
+        b.addEventListener('click', (e) => {
+          e.preventDefault();
+          this.verMarcador();
+        })
+      );
+      $('#btn-cerrar-marcador').addEventListener('click', () => this.mostrar(this.pantallaAntesMarcador || 'p-inicio'));
+      $('#img-hiro').addEventListener('error', () => {
+        const img = $('#img-hiro');
+        const siguiente = C.MARCADOR_HIRO[Number(img.dataset.i || 0) + 1];
+        if (siguiente) {
+          img.dataset.i = Number(img.dataset.i || 0) + 1;
+          img.src = siguiente;
+        }
       });
-      $('#btn-cerrar-marcador').addEventListener('click', () => this.mostrar('p-inicio'));
+
+      // guía
+      $('#btn-guia-ok').addEventListener('click', () => {
+        if ($('#chk-guia').checked) U.guardar('guiaVista', true);
+        this.sonidos.activar();
+        if (this._continuarGuia) this._continuarGuia();
+      });
 
       // carga
       $('#btn-reintentar').addEventListener('click', () => this.reintentar());
@@ -176,12 +187,19 @@
         );
       });
       const conManos = this.ajustes.control === 'manos';
-      $('#fila-vista').classList.toggle('deshabilitado', !conManos);
-      $('#nota-mesa').classList.toggle('oculto', !(conManos && this.ajustes.vista === 'mesa'));
+      $('#nota-mesa').classList.toggle('oculto', !conManos);
       $('#resumen-ajustes').textContent =
-        (conManos ? '✋ Manos' : '👆 Táctil') +
-        (conManos ? (this.ajustes.vista === 'mesa' ? ' · 🧾 Mesa' : ' · 📺 Pantalla') : '') +
-        ' · ' + this.ajustes.goles + ' goles';
+        (conManos ? '✌️ Manos en la mesa' : '👆 Práctica sin cámara') + ' · ' + this.ajustes.goles + ' goles';
+    },
+
+    verMarcador() {
+      const img = $('#img-hiro');
+      img.dataset.i = 0;
+      img.src = C.MARCADOR_HIRO[0];
+      $('#link-hiro').href = C.MARCADOR_HIRO[0];
+      const actual = $$('.pantalla').find((p) => p.classList.contains('activa'));
+      this.pantallaAntesMarcador = actual && actual.id !== 'p-marcador' ? actual.id : 'p-inicio';
+      this.mostrar('p-marcador');
     },
 
     /* ====================== PANTALLAS ====================== */
@@ -237,8 +255,9 @@
       this.rol = rol;
       this.humanos = modo === 'local' ? [0, 1] : modo === 'cpu' ? [0] : rol === 'anfitrion' ? [0] : [1];
       this.partido = new FG.Partido({ golesParaGanar: this.ajustes.goles });
+      this.andadores = [new FG.Andador(this.partido, 0), new FG.Andador(this.partido, 1)];
       this.cpu = modo === 'cpu' ? new FG.CPU(this.partido, 1, this.ajustes.dificultad) : null;
-      this.filtros = [new U.FiltroEuro2D(1.6, 0.03), new U.FiltroEuro2D(1.6, 0.03)];
+      this.filtros = [0, 1].map(() => [new U.FiltroEuro2D(1.6, 0.03), new U.FiltroEuro2D(1.6, 0.03)]);
       this.ultimaPos = [null, null];
       this.tSinEntrada = [9, 9];
       this.listo = [0, 0];
@@ -248,12 +267,19 @@
       this.eventosRed = [];
       this.eventosRecibidos = [];
       this.controlActual = C.MODO_DEMO ? 'tactil' : this.ajustes.control;
-      this.vistaAR = this.controlActual === 'manos' && this.ajustes.vista === 'mesa';
+      this.vistaAR = this.controlActual === 'manos';
       this.puntero.reiniciar();
-      this.fase = 'carga';
 
-      if (this.controlActual === 'manos') {
-        const ok = await this.prepararCamara(token);
+      if (this.vistaAR) {
+        if (!U.leer('guiaVista', false)) {
+          this.fase = 'guia';
+          this.mostrar('p-guia');
+          await new Promise((resolver) => (this._continuarGuia = resolver));
+          this._continuarGuia = null;
+          if (token !== this.tokenPrep) return;
+        }
+        this.fase = 'carga';
+        const ok = await this.prepararAR(token);
         if (!ok || token !== this.tokenPrep) return;
       }
       this.entrarEscenario();
@@ -264,52 +290,45 @@
       this.prepararPartida(this.ultimaPrep.modo, this.ultimaPrep.rol);
     },
 
-    async prepararCamara(token) {
+    async prepararAR(token) {
       this.mostrar('p-carga');
       const pasos = { ar: $('#paso-ar'), camara: $('#paso-camara'), modelo: $('#paso-modelo') };
       Object.values(pasos).forEach((p) => (p.dataset.estado = ''));
-      pasos.ar.classList.toggle('oculto', !this.vistaAR);
       $('#carga-error').classList.add('oculto');
       $('#carga-spinner').classList.remove('oculto');
-      $('#carga-titulo').textContent = 'Preparando el juego…';
+      $('#carga-titulo').textContent = 'Preparando el futbolito…';
       let paso = null;
       const marcar = (p, estado) => {
         p.dataset.estado = estado;
         if (estado === 'activo') paso = p;
       };
       try {
-        if (this.vistaAR) {
-          marcar(pasos.ar, 'activo');
-          if (!this.ar) this.ar = new FG.RenderAR($('#contenedor-ar'));
-          try {
-            await this.ar.cargarLibrerias();
-          } catch (e) {
-            e.codigo = 'arjs';
-            throw e;
-          }
-          marcar(pasos.ar, 'hecho');
-          marcar(pasos.camara, 'activo');
-          FG.Camara.detener();
-          document.body.classList.add('modo-ar');
-          if (!this.ar.video) await this.ar.crearEscena();
-          this.videoActivo = this.ar.video;
-        } else {
-          marcar(pasos.camara, 'activo');
-          if (!FG.Camara.stream) await FG.Camara.iniciar(this.video);
-          this.videoActivo = this.video;
-        }
-        if (token !== this.tokenPrep) {
-          if (!this.vistaAR) FG.Camara.detener(); // el usuario volvió al menú mientras cargaba
-          return false;
-        }
+        marcar(pasos.camara, 'activo');
+        if (!this.ar || !this.ar.video) await FG.Camara.verificar();
         marcar(pasos.camara, 'hecho');
+        if (token !== this.tokenPrep) return false;
+
+        marcar(pasos.ar, 'activo');
+        if (!this.ar) this.ar = new FG.RenderAR($('#contenedor-ar'));
+        try {
+          await this.ar.cargarLibrerias();
+        } catch (e) {
+          e.codigo = 'arjs';
+          throw e;
+        }
+        document.body.classList.add('modo-ar');
+        if (!this.ar.video) await this.ar.crearEscena();
+        this.camAR = FG.CamaraAR.desdeAR(this.ar);
+        marcar(pasos.ar, 'hecho');
+        if (token !== this.tokenPrep) return false;
+
         marcar(pasos.modelo, 'activo');
         await this.tracker.cargar(2);
         if (token !== this.tokenPrep) return false;
         marcar(pasos.modelo, 'hecho');
         return true;
       } catch (e) {
-        console.error('[FingerGol] error al preparar la cámara', e);
+        console.error('[FingerGol] error al preparar la realidad aumentada', e);
         if (token !== this.tokenPrep) return false;
         if (paso) paso.dataset.estado = 'fallo';
         $('#carga-spinner').classList.add('oculto');
@@ -322,17 +341,16 @@
 
     entrarEscenario() {
       this.mostrar(null);
-      const conCamaraPantalla = this.controlActual === 'manos' && !this.vistaAR;
       document.body.classList.add('en-juego');
-      document.body.classList.toggle('con-camara', conCamaraPantalla);
-      this.renderer.conCamara = conCamaraPantalla;
+      if (this.vistaAR) this.renderer.usarCamara(this.camAR, true);
+      else this.renderer.usarCamara(this.renderer.virtual, false);
       $('#hud').classList.remove('oculto');
       $('#btn-pausa').textContent = this.modo === 'online' ? '✕' : '⏸';
       this.actualizarNombres();
       this.actualizarMarcador();
       this.pedirWakeLock();
 
-      if (this.controlActual === 'manos' || this.modo === 'online') this.abrirLobby();
+      if (this.vistaAR || this.modo === 'online') this.abrirLobby();
       else this.empezarPartido();
     },
 
@@ -340,31 +358,48 @@
       this.fase = 'lobby';
       const lobby = $('#p-lobby');
       lobby.classList.add('activa');
-      lobby.classList.toggle('sin-lados', this.controlActual !== 'manos');
+      lobby.classList.toggle('sin-lados', !this.vistaAR);
       const nombres = this.nombresLargos();
       [0, 1].forEach((lado) => {
         $(`#lado${lado}-nombre`).textContent = nombres[lado];
         $(`#lado${lado}`).classList.toggle('remoto', !this.humanos.includes(lado));
       });
-      $('#lobby-titulo').textContent = this.controlActual === 'manos' ? '¡Muestra tu mano! ✋' : 'Esperando a tu rival…';
-      $('#lobby-sub').textContent =
-        this.controlActual === 'manos'
-          ? this.humanos.length === 2
-            ? 'Cada jugador apunta con el dedo índice en su lado.'
-            : 'Apunta con el dedo índice. Tu ficha seguirá a tu dedo.'
-          : 'El partido empieza cuando los dos estén listos.';
+      this.textosLobby();
       $('#btn-empezar-ya').classList.toggle('oculto', this.modo === 'online' && this.rol === 'invitado');
+    },
+
+    textosLobby(esperandoMarcador) {
+      if (!this.vistaAR) {
+        $('#lobby-titulo').textContent = 'Esperando a tu rival…';
+        $('#lobby-sub').textContent = 'El partido empieza cuando los dos estén listos.';
+        return;
+      }
+      if (esperandoMarcador) {
+        $('#lobby-titulo').textContent = '🧾 Apunta la cámara al marcador';
+        $('#lobby-sub').textContent = 'Cuando aparezca el futbolito, deja el celular quieto.';
+        return;
+      }
+      $('#lobby-titulo').textContent = '¡Pon tu mano como piernas! ✌️';
+      $('#lobby-sub').textContent =
+        this.humanos.length === 2
+          ? 'Cada jugador apoya el índice y el medio en su lado de la cancha.'
+          : 'Apoya el índice y el medio en tu lado de la cancha.';
     },
 
     ocultarLobby() {
       $('#p-lobby').classList.remove('activa');
+      document.body.classList.remove('lobby-marcador');
     },
 
     actualizarLobby(asig, dt) {
-      const manos = this.controlActual === 'manos';
-      const esperandoMarcador = this.vistaAR && this.ar && !this.ar.visto;
+      const esperandoMarcador = this.vistaAR && !(this.camAR && this.camAR.visible());
+      document.body.classList.toggle('lobby-marcador', esperandoMarcador);
+      if (esperandoMarcador !== this._esperandoMarcador) {
+        this._esperandoMarcador = esperandoMarcador;
+        this.textosLobby(esperandoMarcador);
+      }
       for (const lado of this.humanos) {
-        if (!manos) this.listo[lado] = LISTO_SEG;
+        if (!this.vistaAR) this.listo[lado] = LISTO_SEG;
         else if (asig[lado] && !esperandoMarcador) this.listo[lado] = Math.min(LISTO_SEG, this.listo[lado] + dt);
         else this.listo[lado] = Math.max(0, this.listo[lado] - dt * 0.6);
       }
@@ -378,7 +413,13 @@
           barra.style.width = Math.round(pct * 100) + '%';
           panel.classList.toggle('detectado', !!asig[lado]);
           panel.classList.toggle('listo', pct >= 1);
-          estado.textContent = pct >= 1 ? '¡Listo! ✓' : asig[lado] ? 'Mantén la mano quieta…' : 'Pon tu mano de este lado';
+          estado.textContent = esperandoMarcador
+            ? 'Primero el marcador 🧾'
+            : pct >= 1
+              ? '¡Listo! ✓'
+              : asig[lado]
+                ? 'Mantén los dedos en la mesa…'
+                : 'Pon tus dedos de este lado';
         } else {
           const listoOtro = this.modo === 'cpu' || this.rivalListo;
           barra.style.width = listoOtro ? '100%' : '0%';
@@ -388,22 +429,18 @@
         }
       });
 
-      if (esperandoMarcador) {
-        $('#lobby-titulo').textContent = '🧾 Apunta la cámara al marcador Hiro';
-        $('#lobby-sub').textContent = 'Cuando aparezca la cancha, muestra tu mano.';
-        return;
-      }
-      if (this.vistaAR) $('#lobby-titulo').textContent = '¡Muestra tu mano! ✋';
-
+      if (esperandoMarcador) return;
       const localesListos = this.humanos.every((l) => this.listo[l] >= LISTO_SEG);
       if (!localesListos) return;
       if (this.modo === 'online') {
-        if (!this.listoEnviado) {
+        if (!this.listoEnviado && this.red) {
           this.red.enviar({ t: 'listo' });
           this.listoEnviado = true;
         }
         if (this.rol === 'anfitrion' && this.rivalListo) this.empezarPartido();
-        else $('#lobby-sub').textContent = this.rol === 'anfitrion' ? 'Esperando a que tu rival muestre su mano…' : 'Esperando al anfitrión…';
+        else
+          $('#lobby-sub').textContent =
+            this.rol === 'anfitrion' ? 'Esperando a que tu rival esté listo…' : 'Esperando al anfitrión…';
       } else {
         this.empezarPartido();
       }
@@ -413,7 +450,7 @@
       this.sonidos.activar();
       if (this.modo === 'online') {
         if (this.rol === 'anfitrion') {
-          this.red.enviar({ t: 'listo' });
+          if (this.red) this.red.enviar({ t: 'listo' });
           this.empezarPartido();
         }
         return;
@@ -483,7 +520,7 @@
     pedirRevancha() {
       this.sonidos.activar();
       if (this.modo === 'online' && this.rol === 'invitado') {
-        this.red.enviar({ t: 'revancha' });
+        if (this.red) this.red.enviar({ t: 'revancha' });
         this.aviso('Le pedimos la revancha a tu rival…');
         return;
       }
@@ -493,6 +530,11 @@
 
     irAlMenu() {
       this.tokenPrep++;
+      if (this._continuarGuia) {
+        const c = this._continuarGuia;
+        this._continuarGuia = null;
+        c();
+      }
       if (this.red) {
         this.red.cerrar();
         this.red = null;
@@ -501,8 +543,6 @@
         location.reload(); // AR.js deja su cámara abierta: recargar es lo más limpio
         return;
       }
-      FG.Camara.detener();
-      this.video.srcObject = null;
       this.partido = null;
       this.cpu = null;
       this.modo = null;
@@ -511,8 +551,8 @@
       this.ocultarLobby();
       $('#hud').classList.add('oculto');
       $('#mensaje-central').classList.add('oculto');
-      document.body.classList.remove('en-juego', 'con-camara');
-      this.renderer.conCamara = false;
+      document.body.classList.remove('en-juego');
+      this.renderer.usarCamara(this.renderer.virtual, false);
       this.soltarWakeLock();
       this.mostrar('p-inicio');
     },
@@ -554,34 +594,49 @@
     },
 
     /* ====================== ENTRADAS ====================== */
+    /**
+     * Devuelve una lista de entradas en coordenadas de cancha:
+     *  - mano: { mano:true, pies:[{x,y,ang},{x,y,ang}], x, y, xLado, dib }
+     *  - puntero/teclado: { x, y, xLado, patear, lado? }
+     */
     leerEntradas(ahora, dt) {
       const lista = [];
       this.manosDibujo = [];
-      if (this.controlActual === 'manos' && this.tracker.listo) {
-        const mapa = this.vistaAR ? this.ar : this.renderer;
-        const manos = this.tracker.detectar(this.videoActivo, ahora);
+      if (this.vistaAR && this.tracker.listo && this.ar && this.ar.video) {
+        const manos = this.tracker.detectar(this.ar.video, ahora);
+        const cam = this.camAR;
         for (const m of manos) {
-          const puntos = m.puntos.map((p) => mapa.videoAPantalla(p.x, p.y));
-          const dib = { puntos, color: '#dfe6ff' };
+          const puntos = m.puntos.map((p) => this.ar.videoAPantalla(p.x, p.y));
+          const dib = { puntos, color: '#dfe6ff', lado: null };
           this.manosDibujo.push(dib);
-          const f = mapa.pantallaACancha(puntos[8][0], puntos[8][1]);
-          if (!f) continue;
-          const fm = mapa.pantallaACancha(puntos[0][0], puntos[0][1]) || f;
-          lista.push({ x: f[0], y: f[1], xLado: fm[0], mano: m, dib });
+          if (!cam.visible()) continue;
+          const aPlano = (i) => cam.pantallaAPlano(puntos[i][0], puntos[i][1]);
+          const p8 = aPlano(8);
+          const p12 = aPlano(12);
+          if (!p8 || !p12) continue;
+          const p6 = aPlano(6) || p8;
+          const p10 = aPlano(10) || p12;
+          const muneca = aPlano(0) || [(p8[0] + p12[0]) / 2, 0];
+          const pies = [
+            { x: p8[0], y: p8[1], ang: Math.atan2(p8[1] - p6[1], p8[0] - p6[0]) },
+            { x: p12[0], y: p12[1], ang: Math.atan2(p12[1] - p10[1], p12[0] - p10[0]) }
+          ];
+          lista.push({ mano: true, pies, x: (p8[0] + p12[0]) / 2, y: (p8[1] + p12[1]) / 2, xLado: muneca[0], dib });
         }
       }
-      if (this.controlActual === 'tactil') {
+      if (!this.vistaAR) {
         for (const p of this.puntero.lista()) {
-          const f = this.renderer.pantallaACancha(p.sx, p.sy);
-          lista.push({ x: f[0], y: f[1], xLado: f[0] });
+          const f = this.renderer.virtual.pantallaAPlano(p.sx, p.sy);
+          if (!f) continue;
+          lista.push({ x: f[0], y: f[1], xLado: f[0], patear: p.patear });
         }
       }
-      for (const k of this.puntero.teclado(dt, this.partido)) lista.push(k);
+      if (this.partido) for (const k of this.puntero.teclado(dt, this.partido)) lista.push(Object.assign({ xLado: k.x }, k));
       return lista;
     },
 
-    /** Decide qué mano/dedo controla a cada jugador. */
-    asignar(entradas, t, dt) {
+    /** Decide qué mano/dedo controla a cada jugador local. */
+    asignar(entradas) {
       const res = [null, null];
       const libres = [];
       for (const e of entradas) {
@@ -607,31 +662,49 @@
         // dos jugadores: tu mano es tuya si tu muñeca está en tu mitad
         for (const lado of [0, 1]) {
           if (res[lado]) continue;
-          const cand = libres.filter((e) => (e.xLado < W / 2) === (lado === 0));
-          res[lado] = masCercana(cand, this.ultimaPos[lado]);
+          res[lado] = masCercana(libres.filter((e) => (e.xLado < W / 2) === (lado === 0)), this.ultimaPos[lado]);
         }
       } else if (this.humanos.length === 1) {
         const lado = this.humanos[0];
         if (!res[lado]) res[lado] = masCercana(libres, this.ultimaPos[lado]);
       }
+      return res;
+    },
 
-      const salida = [null, null];
-      for (const lado of [0, 1]) {
-        const e = res[lado];
-        if (e) {
-          if (e.dib) e.dib.color = C.EQUIPOS[lado].color;
-          if (this.tSinEntrada[lado] > 0.4) this.filtros[lado].reiniciar();
-          this.tSinEntrada[lado] = 0;
-          const p = e.mano ? this.filtros[lado].filtrar(e.x, e.y, t) : { x: e.x, y: e.y };
-          this.ultimaPos[lado] = p;
-          salida[lado] = p;
-        } else {
-          this.tSinEntrada[lado] += dt;
-          // toleramos huecos cortos del detector
-          if (this.tSinEntrada[lado] < 0.25 && this.ultimaPos[lado]) salida[lado] = this.ultimaPos[lado];
+    /** Convierte la entrada asignada en la posición de los dos pies del jugador. */
+    controlarJugador(lado, e, t, dt) {
+      const P = this.partido;
+      if (e && e.mano) {
+        if (this.tSinEntrada[lado] > 0.4) this.filtros[lado].forEach((f) => f.reiniciar());
+        this.tSinEntrada[lado] = 0;
+        const pies = e.pies.map((p, k) => Object.assign(this.filtros[lado][k].filtrar(p.x, p.y, t), { ang: p.ang }));
+        if (e.dib) {
+          e.dib.color = C.EQUIPOS[lado].color;
+          e.dib.lado = lado;
+          e.dib.numero = this._etiquetas[lado];
         }
+        this.ultimaPos[lado] = { x: e.x, y: e.y };
+        this.ultimosPies = this.ultimosPies || [null, null];
+        this.ultimosPies[lado] = pies;
+        P.fijarPies(lado, pies);
+        return { pies, cuerpo: null };
       }
-      return salida;
+      if (this.vistaAR) {
+        // con cámara: toleramos huecos cortos del detector, luego "¿Y tu mano?"
+        this.tSinEntrada[lado] += dt;
+        const ultimos = this.ultimosPies && this.ultimosPies[lado];
+        if (this.tSinEntrada[lado] < 0.25 && ultimos) {
+          P.fijarPies(lado, ultimos);
+          return { pies: ultimos, cuerpo: null };
+        }
+        P.fijarPies(lado, null);
+        return null;
+      }
+      // modo práctica: un muñeco que camina hacia el puntero
+      if (e) this.ultimaPos[lado] = { x: e.x, y: e.y };
+      const r = this.andadores[lado].actualizar(dt, e ? { x: e.x, y: e.y } : null, e && e.patear);
+      P.fijarPies(lado, r.pies, r.cuerpo);
+      return r;
     },
 
     /* ====================== BUCLE ====================== */
@@ -640,31 +713,37 @@
       const dt = Math.min(0.05, Math.max(0, (ahora - (this.tPrev || ahora)) / 1000));
       this.tPrev = ahora;
 
-      if (!this.partido || this.fase === 'menu' || this.fase === 'carga') {
+      if (this.ar && this.ar.ancla) {
+        this.ar.actualizar(dt);
+        if (this.camAR) this.camAR.preparar();
+      }
+
+      if (!this.partido || this.fase === 'menu' || this.fase === 'carga' || this.fase === 'guia') {
         this.bucleFondo(dt);
         return;
       }
 
+      const t = ahora / 1000;
+      const corre = this.fase === 'juego' || this.fase === 'lobby' || this.fase === 'fin';
+      const pasoDt = corre ? dt : 0;
       const entradas = this.leerEntradas(ahora, dt);
-      const asig = this.asignar(entradas, ahora / 1000, dt);
+      const asig = this.asignar(entradas);
       if (this.fase === 'lobby') this.actualizarLobby(asig, dt);
 
-      for (const lado of this.humanos) {
-        const a = asig[lado];
-        this.partido.fijarObjetivo(lado, a ? a.x : null, a ? a.y : null);
-      }
+      const propios = {};
+      for (const lado of this.humanos) propios[lado] = this.controlarJugador(lado, asig[lado], t, pasoDt);
 
-      const corre = this.fase === 'juego' || this.fase === 'lobby' || this.fase === 'fin';
       const simulaAqui = this.modo !== 'online' || this.rol === 'anfitrion';
       if (simulaAqui) {
         if (this.cpu) {
-          const o = this.cpu.actualizar(corre ? dt : 0);
-          this.partido.fijarObjetivo(1, o.x, o.y);
+          const o = this.cpu.actualizar(pasoDt);
+          const r = this.andadores[1].actualizar(pasoDt, o, o.patear);
+          this.partido.fijarPies(1, r.pies, r.cuerpo);
         }
         if (this.modo === 'online') {
           const viejo = performance.now() - (this.tEntradaRival || 0) > 1500;
           const r = viejo ? null : this.entradaRival;
-          this.partido.fijarObjetivo(1, r ? r.x : null, r ? r.y : null);
+          this.partido.fijarPies(1, r && r.pies, r && r.cuerpo);
         }
         if (corre) this.partido.actualizar(dt);
       } else if (corre) {
@@ -676,43 +755,49 @@
         this.eventosRed.push(...eventos);
         this.enviarEstado(ahora);
       } else if (this.modo === 'online') {
-        this.enviarEntrada(ahora, asig[1]);
+        this.enviarEntrada(ahora, propios[1]);
       }
       this.procesarEventos(eventos.concat(this.eventosRecibidos.splice(0)));
 
       this.renderer.actualizarEfectos(dt);
-      if (this.vistaAR && this.ar) this.ar.actualizar(this.partido, dt);
       this.renderer.dibujar(this.partido, {
-        manos: this.manosDibujo,
+        figuras: [0, 1].map((l) => !(this.vistaAR && this.humanos.includes(l))),
         etiquetas: this._etiquetas,
         locales: this.humanos,
-        avisos: this.controlActual === 'manos' && (this.fase === 'juego' || this.fase === 'lobby'),
-        soloCapas: this.vistaAR,
-        proyectar: this.vistaAR ? (x, y) => this.ar.canchaAPantalla(x, y) : null
+        avisos: this.vistaAR && (this.fase === 'juego' || this.fase === 'lobby'),
+        manos: this.manosDibujo,
+        esqueleto: this.fase === 'lobby',
+        rotulos: this.fase === 'lobby' && this.vistaAR ? this.nombresLargos() : null
       });
     },
 
-    /** En el menú se ve un partido de fondo entre dos máquinas. */
+    /** En el menú se ve un partido de fondo entre dos muñecos de la máquina. */
     bucleFondo(dt) {
+      if (document.body.classList.contains('modo-ar')) {
+        this.renderer.ctx.setTransform(1, 0, 0, 1, 0, 0);
+        this.renderer.ctx.clearRect(0, 0, this.renderer.c.width, this.renderer.c.height);
+        return;
+      }
       if (!this.fondo) {
         const p = new FG.Partido({ golesParaGanar: 999 });
         p.iniciar();
-        this.fondo = { p, cpus: [new FG.CPU(p, 0, 'facil'), new FG.CPU(p, 1, 'facil')] };
+        this.fondo = {
+          p,
+          cpus: [new FG.CPU(p, 0, 'normal'), new FG.CPU(p, 1, 'normal')],
+          andadores: [new FG.Andador(p, 0), new FG.Andador(p, 1)]
+        };
       }
-      const { p, cpus } = this.fondo;
+      const { p, cpus, andadores } = this.fondo;
       cpus.forEach((c, i) => {
         const o = c.actualizar(dt);
-        p.fijarObjetivo(i, o.x, o.y);
+        const r = andadores[i].actualizar(dt, o, o.patear);
+        p.fijarPies(i, r.pies, r.cuerpo);
       });
       p.actualizar(dt);
       p.sacarEventos();
-      if (document.body.classList.contains('modo-ar')) {
-        this.renderer.transformPantalla();
-        this.renderer.ctx.clearRect(0, 0, this.renderer.w, this.renderer.h);
-        return;
-      }
+      this.renderer.usarCamara(this.renderer.virtual, false);
       this.renderer.actualizarEfectos(dt);
-      this.renderer.dibujar(p, { etiquetas: ['1', '2'], avisos: false });
+      this.renderer.dibujar(p, { figuras: [true, true], etiquetas: ['1', '2'] });
     },
 
     procesarEventos(eventos) {
@@ -725,7 +810,7 @@
               this.renderer.efectoPatada(e.x, e.y, e.fuerza, C.EQUIPOS[e.lado].color);
               this.tChispa = ahora;
             }
-            if (e.fuerza > 190 && ahora - (this.tFrase || 0) > 1500) {
+            if (e.fuerza > 200 && ahora - (this.tFrase || 0) > 1500) {
               const frases = ['¡Zapatazo!', '¡Bombazo!', '¡Cañonazo!', '¡Qué fuerza!'];
               this.renderer.textoFlotante(frases[(Math.random() * frases.length) | 0], e.x, e.y, C.EQUIPOS[e.lado].color);
               this.tFrase = ahora;
@@ -802,7 +887,9 @@
       red.on('rival-salio', () => this.rivalSalio('Tu rival salió del partido.'));
       red.on('desconectado', () => this.rivalSalio('Se perdió la conexión con el servidor.'));
       red.on('in', (m) => {
-        this.entradaRival = m.x == null ? null : { x: m.x, y: m.y };
+        const pies = m.p ? m.p.map((q) => ({ x: q[0], y: q[1], ang: q[2] })) : null;
+        const cuerpo = m.c ? { x: m.c[0], y: m.c[1], ang: m.c[2] } : null;
+        this.entradaRival = pies ? { pies, cuerpo } : null;
         this.tEntradaRival = performance.now();
       });
       red.on('listo', () => {
@@ -851,9 +938,7 @@
       try {
         await this.conectarRed();
       } catch (e) {
-        this.errorOnline(
-          'No se pudo conectar al servidor del juego. Asegúrate de abrir la misma dirección que tu amigo.'
-        );
+        this.errorOnline('No se pudo conectar al servidor del juego. Asegúrate de abrir la misma dirección que tu amigo.');
         return;
       }
       this.red.on('unido', () => this.prepararPartida('online', 'invitado'));
@@ -884,11 +969,20 @@
       this.red.enviar(s);
     },
 
-    enviarEntrada(ahora, pos) {
+    enviarEntrada(ahora, control) {
       if (!this.red || ahora - this.tRed < 33) return;
       this.tRed = ahora;
       const r = (v) => Math.round(v * 10) / 10;
-      this.red.enviar(pos ? { t: 'in', x: r(pos.x), y: r(pos.y) } : { t: 'in', x: null });
+      const a = (v) => Math.round(v * 100) / 100;
+      if (!control) {
+        this.red.enviar({ t: 'in', p: null });
+        return;
+      }
+      this.red.enviar({
+        t: 'in',
+        p: control.pies.map((q) => [r(q.x), r(q.y), a(q.ang)]),
+        c: control.cuerpo ? [r(control.cuerpo.x), r(control.cuerpo.y), a(control.cuerpo.ang)] : null
+      });
     },
 
     recibirEstado(m) {
