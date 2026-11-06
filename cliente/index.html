@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#070b1a">
+  <meta name="description" content="FingerGol AR: fútbol con los dedos en realidad aumentada. Juega con tu mano frente a la cámara.">
+  <title>FingerGol AR — fútbol con los dedos</title>
+  <link rel="icon" href="assets/icono.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+
+  <!-- ================= ESCENARIO (cámara + cancha) ================= -->
+  <div id="escenario">
+    <video id="video" playsinline muted autoplay></video>
+    <div id="contenedor-ar"></div>
+    <canvas id="lienzo"></canvas>
+  </div>
+
+  <!-- ================= HUD: marcador y botones ================= -->
+  <div id="hud" class="oculto">
+    <button id="btn-pausa" class="btn-icono" aria-label="Pausa" title="Pausa">⏸</button>
+    <div id="marcador" aria-live="polite">
+      <div class="equipo eq0">
+        <span class="nombre" id="nombre0">JUGADOR 1</span>
+        <span class="goles" id="goles0">0</span>
+      </div>
+      <div class="meta" id="meta-goles">a 5</div>
+      <div class="equipo eq1">
+        <span class="goles" id="goles1">0</span>
+        <span class="nombre" id="nombre1">JUGADOR 2</span>
+      </div>
+    </div>
+    <div class="hud-der">
+      <button id="btn-sonido" class="btn-icono" aria-label="Sonido" title="Sonido">🔊</button>
+      <button id="btn-pantalla" class="btn-icono" aria-label="Pantalla completa" title="Pantalla completa">⛶</button>
+    </div>
+  </div>
+  <div id="mensaje-central" class="oculto" aria-live="assertive"></div>
+  <div id="aviso" class="oculto" role="status"></div>
+  <div id="banner-demo" class="oculto">
+    Vista previa en Claude: aquí se juega con <b>mouse, táctil o teclado</b>.
+    Para jugar con las <b>manos</b> ejecuta el proyecto (mira el README).
+  </div>
+
+  <!-- ================= INICIO ================= -->
+  <section id="p-inicio" class="pantalla activa">
+    <div class="tarjeta tarjeta-inicio">
+      <header class="logo">
+        <svg class="logo-balon" viewBox="0 0 64 64" aria-hidden="true">
+          <circle cx="32" cy="32" r="29" fill="#fff" stroke="#1b2233" stroke-width="3"/>
+          <polygon points="32,19 44,28 39.5,42 24.5,42 20,28" fill="#1b2233"/>
+          <path d="M32 19V5M44 28l13-5M39.5 42l8 11M24.5 42l-8 11M20 28L7 23" stroke="#1b2233" stroke-width="3" fill="none"/>
+        </svg>
+        <h1>Finger<span>Gol</span> <em>AR</em></h1>
+        <p class="lema">Fútbol con los dedos, en realidad aumentada</p>
+      </header>
+
+      <ol class="como-jugar" aria-label="Cómo se juega">
+        <li><b>☝️</b><span>Muestra tu dedo índice a la cámara</span></li>
+        <li><b>⚽</b><span>Empuja el balón con tu ficha</span></li>
+        <li><b>🥅</b><span>Mete gol en el arco rival</span></li>
+      </ol>
+
+      <div class="modos">
+        <button class="modo destacado" data-modo="local">
+          <span class="ico">👥</span>
+          <span class="txt"><span class="tit">2 jugadores</span><span class="sub">Misma pantalla · una mano cada uno</span></span>
+          <span class="flecha">›</span>
+        </button>
+        <button class="modo" data-modo="cpu">
+          <span class="ico">🤖</span>
+          <span class="txt"><span class="tit">Contra la máquina</span><span class="sub">Para jugar solo</span></span>
+          <span class="flecha">›</span>
+        </button>
+        <button class="modo" data-modo="online">
+          <span class="ico">🌐</span>
+          <span class="txt"><span class="tit">En línea</span><span class="sub" id="sub-online">Con un amigo en otro dispositivo</span></span>
+          <span class="flecha">›</span>
+        </button>
+      </div>
+
+      <details class="ajustes" id="ajustes">
+        <summary><span>⚙️ Ajustes</span> <span class="resumen" id="resumen-ajustes"></span></summary>
+        <div class="fila">
+          <span class="etq">Control</span>
+          <div class="segmentos" data-ajuste="control">
+            <button data-valor="manos">✋ Manos (cámara)</button>
+            <button data-valor="tactil">👆 Táctil / mouse</button>
+          </div>
+        </div>
+        <div class="fila" id="fila-vista">
+          <span class="etq">Vista AR</span>
+          <div class="segmentos" data-ajuste="vista">
+            <button data-valor="pantalla">📺 Pantalla</button>
+            <button data-valor="mesa">🧾 Mesa (marcador)</button>
+          </div>
+        </div>
+        <p class="nota" id="nota-mesa">Modo Mesa: imprime el <button class="enlace" id="btn-ver-marcador">marcador Hiro</button>, ponlo sobre la mesa y deja el celular quieto apuntándolo.</p>
+        <div class="fila">
+          <span class="etq">Goles para ganar</span>
+          <div class="segmentos" data-ajuste="goles">
+            <button data-valor="3">3</button>
+            <button data-valor="5">5</button>
+            <button data-valor="7">7</button>
+          </div>
+        </div>
+        <div class="fila">
+          <span class="etq">Máquina</span>
+          <div class="segmentos" data-ajuste="dificultad">
+            <button data-valor="facil">Fácil</button>
+            <button data-valor="normal">Normal</button>
+            <button data-valor="dificil">Difícil</button>
+          </div>
+        </div>
+        <p class="nota">Sin cámara: Jugador 1 usa <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> y Jugador 2 las <kbd>flechas</kbd>, o toquen la pantalla con un dedo cada uno.</p>
+      </details>
+
+      <footer class="pie">Hecho por <b>SantiSarm</b> · MediaPipe + AR.js</footer>
+    </div>
+  </section>
+
+  <!-- ================= EN LÍNEA ================= -->
+  <section id="p-online" class="pantalla">
+    <div class="tarjeta">
+      <button class="btn-volver" data-volver>← Volver</button>
+      <h2>🌐 Jugar en línea</h2>
+      <p class="sub-tarjeta">Cada uno juega desde su propio dispositivo con su cámara.</p>
+      <div id="online-opciones">
+        <button id="btn-crear" class="btn grande">➕ Crear sala</button>
+        <div class="separador"><span>o únete con un código</span></div>
+        <form id="form-unir" autocomplete="off">
+          <input id="input-codigo" maxlength="4" placeholder="ABCD" inputmode="text" autocapitalize="characters" spellcheck="false" aria-label="Código de sala">
+          <button class="btn" type="submit">Unirme</button>
+        </form>
+      </div>
+      <div id="online-espera" class="oculto">
+        <p>Dile a tu amigo que entre a <b>En línea</b> y escriba este código:</p>
+        <div id="codigo-sala" class="codigo">----</div>
+        <button id="btn-copiar" class="btn sec">📋 Copiar código</button>
+        <p class="estado"><span class="punto"></span> Esperando a tu rival…</p>
+      </div>
+      <p id="online-error" class="error oculto" role="alert"></p>
+    </div>
+  </section>
+
+  <!-- ================= CARGA (cámara + detector) ================= -->
+  <section id="p-carga" class="pantalla">
+    <div class="tarjeta centro">
+      <div class="spinner" id="carga-spinner"></div>
+      <h2 id="carga-titulo">Preparando el juego…</h2>
+      <ul class="pasos">
+        <li id="paso-ar" class="oculto"><span class="ic"></span><span><b>Cargar AR.js</b><small>Realidad aumentada para la mesa</small></span></li>
+        <li id="paso-camara"><span class="ic"></span><span><b>Encender la cámara</b><small>Pulsa “Permitir” si el navegador lo pregunta</small></span></li>
+        <li id="paso-modelo"><span class="ic"></span><span><b>Cargar el detector de manos</b><small>La primera vez tarda unos segundos</small></span></li>
+      </ul>
+      <div id="carga-error" class="oculto">
+        <p class="error" id="carga-error-texto"></p>
+        <div class="botones">
+          <button id="btn-reintentar" class="btn">🔄 Reintentar</button>
+          <button id="btn-sin-camara" class="btn sec">👆 Jugar sin cámara</button>
+        </div>
+      </div>
+      <button class="btn-link" data-menu>Volver al menú</button>
+    </div>
+  </section>
+
+  <!-- ================= LOBBY: muestra tu mano ================= -->
+  <section id="p-lobby" class="capa">
+    <div class="lobby-lados">
+      <div class="lado lado0" id="lado0">
+        <div class="mano-anim">☝️</div>
+        <b class="lado-nombre" id="lado0-nombre">Jugador 1</b>
+        <span class="lado-estado" id="lado0-estado">Pon tu mano de este lado</span>
+        <div class="barra"><i id="lado0-barra"></i></div>
+      </div>
+      <div class="lado lado1" id="lado1">
+        <div class="mano-anim">☝️</div>
+        <b class="lado-nombre" id="lado1-nombre">Jugador 2</b>
+        <span class="lado-estado" id="lado1-estado">Pon tu mano de este lado</span>
+        <div class="barra"><i id="lado1-barra"></i></div>
+      </div>
+    </div>
+    <div class="lobby-centro">
+      <h2 id="lobby-titulo">¡Muestra tu mano! ✋</h2>
+      <p id="lobby-sub">Apunta con el dedo índice. Tu ficha seguirá a tu dedo.</p>
+      <p class="lobby-tip">💡 Buena luz y la mano a 40–70 cm de la cámara</p>
+      <button id="btn-empezar-ya" class="btn sec">Empezar ya ▶</button>
+    </div>
+  </section>
+
+  <!-- ================= PAUSA ================= -->
+  <section id="p-pausa" class="pantalla modal">
+    <div class="tarjeta centro">
+      <h2>⏸ Pausa</h2>
+      <div class="botones col">
+        <button id="btn-continuar" class="btn grande">▶ Continuar</button>
+        <button id="btn-reiniciar" class="btn sec">🔄 Reiniciar partido</button>
+        <button class="btn sec" data-menu>🏠 Menú principal</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SALIR (en línea) ================= -->
+  <section id="p-salir" class="pantalla modal">
+    <div class="tarjeta centro">
+      <h2>¿Salir del partido?</h2>
+      <p class="sub-tarjeta">En línea el partido no se puede pausar.</p>
+      <div class="botones col">
+        <button id="btn-seguir" class="btn grande">⚽ Seguir jugando</button>
+        <button class="btn sec" data-menu>🚪 Salir</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= FIN ================= -->
+  <section id="p-fin" class="pantalla modal">
+    <div class="tarjeta centro">
+      <div class="trofeo" id="fin-icono">🏆</div>
+      <h2 id="fin-titulo">¡Ganó Jugador 1!</h2>
+      <div class="fin-marcador"><span class="c0" id="fin-g0">5</span><span>-</span><span class="c1" id="fin-g1">3</span></div>
+      <p class="sub-tarjeta" id="fin-sub"></p>
+      <div class="botones col">
+        <button id="btn-revancha" class="btn grande">🔁 Revancha</button>
+        <button class="btn sec" data-menu>🏠 Menú principal</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= AVISO GENERAL ================= -->
+  <section id="p-alerta" class="pantalla modal">
+    <div class="tarjeta centro">
+      <h2 id="alerta-titulo">Aviso</h2>
+      <p class="sub-tarjeta" id="alerta-texto"></p>
+      <div class="botones col">
+        <button class="btn grande" data-menu>🏠 Menú principal</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= MARCADOR HIRO ================= -->
+  <section id="p-marcador" class="pantalla modal">
+    <div class="tarjeta centro">
+      <h2>🧾 Marcador Hiro</h2>
+      <img id="img-hiro" alt="Marcador Hiro de AR.js" width="220" height="220">
+      <p class="sub-tarjeta">Imprímelo (unos 8–10 cm, con borde blanco) o ábrelo en otra pantalla.
+        <a id="link-hiro" target="_blank" rel="noopener">Abrir imagen</a></p>
+      <button class="btn" id="btn-cerrar-marcador">Listo</button>
+    </div>
+  </section>
+
+  <!-- Scripts en orden: configuración → utilidades → módulos → app -->
+  <script src="js/config.js"></script>
+  <script src="js/utilidades.js"></script>
+  <script src="js/audio/sonidos.js"></script>
+  <script src="js/juego/fisica.js"></script>
+  <script src="js/juego/cpu.js"></script>
+  <script src="js/entrada/camara.js"></script>
+  <script src="js/entrada/hand-tracker.js"></script>
+  <script src="js/entrada/puntero.js"></script>
+  <script src="js/render/render-pantalla.js"></script>
+  <script src="js/render/render-ar.js"></script>
+  <script src="js/red/red.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
