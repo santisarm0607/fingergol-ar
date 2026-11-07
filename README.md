@@ -6,10 +6,16 @@ Juego web de fútbol en **realidad aumentada**: la cámara ve tu mano, tu **dedo
 - **Hand tracker** (`cliente/js/entrada/hand-tracker.js`) → convierte esos puntos en jugadores.
 - **Multijugador**: 2 jugadores en la misma cámara, contra la máquina, o **en línea** con código de sala.
 
-Autor: **SantiSarm** · Versión **1.1**
+Autor: **SantiSarm** · Versión **1.2**
+
+### Novedades 1.2: diseño de álbum de láminas
+- El menú es un **álbum abierto**: a la izquierda tus dos puestos (Jugador 1 y 2) y los modos de juego como **sobres de láminas**; a la derecha **tu colección** de 10 figuras.
+- Para escoger figura: toca un puesto y luego una lámina, y se "pega" en tu puesto.
+- Letras nuevas: *Big Shoulders Display* (títulos) y *Barlow* (textos). Colores de álbum: tapa azul, páginas verde cancha, cintas amarillas.
+- Las fichas en la cancha ahora son láminas redondas con borde blanco.
 
 ### Novedades 1.1
-- **Figuras:** escoge un emoji para tu ficha en *Ajustes → Figura J1 / J2*. También aparece en la punta de tu dedo índice. La máquina es 🤖.
+- **Figuras:** escoge un emoji para tu ficha. También aparece en la punta de tu dedo índice. La máquina es 🤖.
 - **Se siente mejor:** pausa cortita al pegar fuerte, temblor, estela de color en los tiros fuertes, cámara lenta en el gol y pitazo final.
 - **Aviso de poca luz** cuando la cámara no ve bien tu mano.
 - Se quitó el Modo Mesa (marcador Hiro). En GitHub Pages el modo En línea aparece desactivado (necesita el servidor).

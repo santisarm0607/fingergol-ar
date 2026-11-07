@@ -333,35 +333,39 @@
       const perdido = !j.activo && esLocal && op.avisos;
       ctx.globalAlpha = perdido ? 0.45 : 1;
 
-      // sombra
-      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      // sombra (la lámina está "pegada" sobre la cancha)
+      ctx.fillStyle = 'rgba(8,20,40,0.35)';
       ctx.beginPath();
-      ctx.ellipse(j.x + 0.9, j.y + 1.3, j.r * 1.02, j.r * 0.9, 0, 0, Math.PI * 2);
+      ctx.arc(j.x + 0.8, j.y + 1.2, j.r * 1.05, 0, Math.PI * 2);
       ctx.fill();
-      // halo
-      const halo = ctx.createRadialGradient(j.x, j.y, j.r * 0.6, j.x, j.y, j.r * 1.75);
-      halo.addColorStop(0, rgba(eq.color, 0.45));
-      halo.addColorStop(1, rgba(eq.color, 0));
-      ctx.fillStyle = halo;
-      ctx.beginPath();
-      ctx.arc(j.x, j.y, j.r * 1.75, 0, Math.PI * 2);
-      ctx.fill();
-      // ficha
-      const g = ctx.createRadialGradient(j.x - j.r * 0.35, j.y - j.r * 0.35, j.r * 0.1, j.x, j.y, j.r);
-      g.addColorStop(0, '#ffffff');
-      g.addColorStop(0.25, eq.color);
-      g.addColorStop(1, eq.oscuro);
-      ctx.fillStyle = g;
+      // borde blanco de lámina
+      ctx.fillStyle = '#ffffff';
       ctx.beginPath();
       ctx.arc(j.x, j.y, j.r, 0, Math.PI * 2);
       ctx.fill();
-      ctx.lineWidth = 0.8;
-      ctx.strokeStyle = '#ffffff';
-      ctx.stroke();
-      ctx.lineWidth = 0.5;
-      ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+      // fondo del color del equipo
+      ctx.fillStyle = eq.color;
       ctx.beginPath();
-      ctx.arc(j.x, j.y, j.r * 0.62, 0, Math.PI * 2);
+      ctx.arc(j.x, j.y, j.r * 0.82, 0, Math.PI * 2);
+      ctx.fill();
+      // brillo de lámina (franja diagonal)
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(j.x, j.y, j.r * 0.82, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      ctx.beginPath();
+      ctx.moveTo(j.x - j.r, j.y - j.r * 0.2);
+      ctx.lineTo(j.x - j.r * 0.2, j.y - j.r);
+      ctx.lineTo(j.x + j.r * 0.15, j.y - j.r);
+      ctx.lineTo(j.x - j.r, j.y + j.r * 0.15);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+      ctx.lineWidth = 0.45;
+      ctx.strokeStyle = eq.oscuro;
+      ctx.beginPath();
+      ctx.arc(j.x, j.y, j.r, 0, Math.PI * 2);
       ctx.stroke();
 
       if (perdido) {
@@ -400,7 +404,7 @@
         ctx.restore();
         if (texto) {
           // nombre pequeño debajo de la ficha
-          ctx.font = `800 ${Math.max(10, rPx * 0.42)}px "Baloo 2", system-ui, sans-serif`;
+          ctx.font = `800 ${Math.max(10, rPx * 0.42)}px "Big Shoulders Display", system-ui, sans-serif`;
           const ancho = ctx.measureText(texto).width + 12;
           const y = sy + rPx + Math.max(9, rPx * 0.35);
           ctx.fillStyle = rgba(C.EQUIPOS[j.lado].oscuro, 0.9);
@@ -412,14 +416,14 @@
           ctx.fillText(texto, sx, y + 1);
         }
       } else {
-        ctx.font = `800 ${Math.max(10, rPx * ((texto || '').length > 2 ? 0.55 : 0.8))}px "Baloo 2", system-ui, sans-serif`;
+        ctx.font = `800 ${Math.max(10, rPx * ((texto || '').length > 2 ? 0.55 : 0.8))}px "Big Shoulders Display", system-ui, sans-serif`;
         ctx.fillStyle = '#ffffff';
         ctx.fillText(texto || String(j.lado + 1), sx, sy + rPx * 0.06);
       }
 
       const esLocal = !op.locales || op.locales.includes(j.lado);
       if (!j.activo && esLocal && op.avisos) {
-        ctx.font = `700 ${Math.max(12, rPx * 0.62)}px "Baloo 2", system-ui, sans-serif`;
+        ctx.font = `700 ${Math.max(12, rPx * 0.62)}px "Big Shoulders Display", system-ui, sans-serif`;
         const msg = '✋ ¿Y tu mano?';
         const ancho = ctx.measureText(msg).width + 16;
         const y = sy - rPx - 22;
@@ -548,7 +552,7 @@
         const a = Math.min(1, t.vida / 0.35);
         const tam = Math.max(18, (this.campo.s || 5) * 5.2) * (avance < 0.15 ? 0.6 + avance * 2.7 : 1);
         ctx.globalAlpha = a;
-        ctx.font = `800 ${tam}px "Baloo 2", system-ui, sans-serif`;
+        ctx.font = `800 ${tam}px "Big Shoulders Display", system-ui, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.lineWidth = 5;

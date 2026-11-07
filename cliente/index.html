@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <meta name="theme-color" content="#070b1a">
+  <meta name="theme-color" content="#14316b">
   <meta name="description" content="FingerGol AR: fútbol con los dedos en realidad aumentada. Juega con tu mano frente a la cámara.">
   <title>FingerGol AR — fútbol con los dedos</title>
   <link rel="icon" href="assets/icono.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/estilos.css?v=1.1">
+  <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Barlow:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/estilos.css?v=1.2">
 </head>
 <body>
 
@@ -46,80 +46,87 @@
     Para jugar con las <b>manos</b> ejecuta el proyecto (mira el README).
   </div>
 
-  <!-- ================= INICIO ================= -->
+  <!-- ================= INICIO: el álbum ================= -->
   <section id="p-inicio" class="pantalla activa">
-    <div class="tarjeta tarjeta-inicio">
-      <header class="logo">
-        <svg class="logo-balon" viewBox="0 0 64 64" aria-hidden="true">
-          <circle cx="32" cy="32" r="29" fill="#fff" stroke="#1b2233" stroke-width="3"/>
-          <polygon points="32,19 44,28 39.5,42 24.5,42 20,28" fill="#1b2233"/>
-          <path d="M32 19V5M44 28l13-5M39.5 42l8 11M24.5 42l-8 11M20 28L7 23" stroke="#1b2233" stroke-width="3" fill="none"/>
-        </svg>
-        <h1>Finger<span>Gol</span> <em>AR</em></h1>
-        <p class="lema">Fútbol con los dedos, en realidad aumentada</p>
-      </header>
+    <div class="album">
 
-      <ol class="como-jugar" aria-label="Cómo se juega">
-        <li><b>☝️</b><span>Muestra tu dedo índice a la cámara</span></li>
-        <li><b>⚽</b><span>Empuja el balón con tu ficha</span></li>
-        <li><b>🥅</b><span>Mete gol en el arco rival</span></li>
-      </ol>
+      <!-- Página izquierda: tu equipo y los modos de juego -->
+      <div class="pagina pagina-izq">
+        <header class="cabecera">
+          <h1 class="titulo">FingerGol</h1>
+          <p class="lema">Fútbol de mesa que juegas con el dedo índice frente a la cámara.</p>
+        </header>
 
-      <div class="modos">
-        <button class="modo destacado" data-modo="local">
-          <span class="ico">👥</span>
-          <span class="txt"><span class="tit">2 jugadores</span><span class="sub">Misma pantalla · una mano cada uno</span></span>
-          <span class="flecha">›</span>
-        </button>
-        <button class="modo" data-modo="cpu">
-          <span class="ico">🤖</span>
-          <span class="txt"><span class="tit">Contra la máquina</span><span class="sub">Para jugar solo</span></span>
-          <span class="flecha">›</span>
-        </button>
-        <button class="modo" data-modo="online">
-          <span class="ico">🌐</span>
-          <span class="txt"><span class="tit">En línea</span><span class="sub" id="sub-online">Con un amigo en otro dispositivo</span></span>
-          <span class="flecha">›</span>
-        </button>
+        <div class="plantel" role="group" aria-label="Figuras de los jugadores">
+          <button class="hueco" data-j="0" aria-label="Escoger figura del jugador 1">
+            <span class="hueco-lamina"><span class="hueco-fig" id="fig-j0">😎</span></span>
+            <span class="hueco-nombre">Jugador 1</span>
+          </button>
+          <span class="vs" aria-hidden="true">vs</span>
+          <button class="hueco" data-j="1" aria-label="Escoger figura del jugador 2">
+            <span class="hueco-lamina"><span class="hueco-fig" id="fig-j1">👽</span></span>
+            <span class="hueco-nombre">Jugador 2</span>
+          </button>
+        </div>
+        <p class="ayuda-plantel">Toca un puesto y luego una lámina de tu colección. Contra la máquina, tu rival es 🤖.</p>
+
+        <div class="sobres">
+          <button class="modo sobre sobre-cpu" data-modo="cpu">
+            <span class="sobre-tit">Contra la máquina</span>
+            <span class="sobre-sub">Juegas solo</span>
+          </button>
+          <button class="modo sobre sobre-local" data-modo="local">
+            <span class="sobre-tit">2 jugadores</span>
+            <span class="sobre-sub">Una mano cada uno, misma cámara</span>
+          </button>
+          <button class="modo sobre sobre-online" data-modo="online">
+            <span class="sobre-tit">En línea</span>
+            <span class="sobre-sub" id="sub-online">Con un amigo en otro dispositivo</span>
+          </button>
+        </div>
       </div>
 
-      <details class="ajustes" id="ajustes">
-        <summary><span>⚙️ Ajustes</span> <span class="resumen" id="resumen-ajustes"></span></summary>
-        <div class="fila">
-          <span class="etq">Control</span>
-          <div class="segmentos" data-ajuste="control">
-            <button data-valor="manos">✋ Manos (cámara)</button>
-            <button data-valor="tactil">👆 Táctil / mouse</button>
-          </div>
-        </div>
-        <div class="fila">
-          <span class="etq">Figura J1</span>
-          <div class="segmentos figuras" data-ajuste="fig0"></div>
-        </div>
-        <div class="fila">
-          <span class="etq">Figura J2</span>
-          <div class="segmentos figuras" data-ajuste="fig1"></div>
-        </div>
-        <div class="fila">
-          <span class="etq">Goles para ganar</span>
-          <div class="segmentos" data-ajuste="goles">
-            <button data-valor="3">3</button>
-            <button data-valor="5">5</button>
-            <button data-valor="7">7</button>
-          </div>
-        </div>
-        <div class="fila">
-          <span class="etq">Máquina</span>
-          <div class="segmentos" data-ajuste="dificultad">
-            <button data-valor="facil">Fácil</button>
-            <button data-valor="normal">Normal</button>
-            <button data-valor="dificil">Difícil</button>
-          </div>
-        </div>
-        <p class="nota">Sin cámara: Jugador 1 usa <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> y Jugador 2 las <kbd>flechas</kbd>, o toquen la pantalla con un dedo cada uno.</p>
-      </details>
+      <!-- Página derecha: la colección de láminas y los ajustes -->
+      <div class="pagina pagina-der">
+        <h2 class="cinta">Mi colección</h2>
+        <div class="coleccion" id="coleccion"></div>
 
-      <footer class="pie">Hecho por <b>SantiSarm</b> · MediaPipe · v1.1</footer>
+        <ol class="como-jugar" aria-label="Cómo se juega">
+          <li>Muestra tu dedo índice a la cámara.</li>
+          <li>Tu ficha sigue la punta del dedo.</li>
+          <li>Empuja el balón hasta el arco rival.</li>
+        </ol>
+
+        <details class="ajustes" id="ajustes">
+          <summary><span>Ajustes</span> <span class="resumen" id="resumen-ajustes"></span></summary>
+          <div class="fila">
+            <span class="etq">Control</span>
+            <div class="segmentos" data-ajuste="control">
+              <button data-valor="manos">Mano (cámara)</button>
+              <button data-valor="tactil">Mouse o táctil</button>
+            </div>
+          </div>
+          <div class="fila">
+            <span class="etq">Goles para ganar</span>
+            <div class="segmentos" data-ajuste="goles">
+              <button data-valor="3">3</button>
+              <button data-valor="5">5</button>
+              <button data-valor="7">7</button>
+            </div>
+          </div>
+          <div class="fila">
+            <span class="etq">Máquina</span>
+            <div class="segmentos" data-ajuste="dificultad">
+              <button data-valor="facil">Fácil</button>
+              <button data-valor="normal">Normal</button>
+              <button data-valor="dificil">Difícil</button>
+            </div>
+          </div>
+          <p class="nota">Sin cámara: el jugador 1 usa <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> y el jugador 2 las <kbd>flechas</kbd>, o toquen la pantalla con un dedo cada uno.</p>
+        </details>
+
+        <footer class="pie">Hecho por <b>SantiSarm</b>, versión 1.2</footer>
+      </div>
     </div>
   </section>
 
@@ -127,10 +134,10 @@
   <section id="p-online" class="pantalla">
     <div class="tarjeta">
       <button class="btn-volver" data-volver>← Volver</button>
-      <h2>🌐 Jugar en línea</h2>
+      <h2>Jugar en línea</h2>
       <p class="sub-tarjeta">Cada uno juega desde su propio dispositivo con su cámara.</p>
       <div id="online-opciones">
-        <button id="btn-crear" class="btn grande">➕ Crear sala</button>
+        <button id="btn-crear" class="btn grande">Crear sala</button>
         <div class="separador"><span>o únete con un código</span></div>
         <form id="form-unir" autocomplete="off">
           <input id="input-codigo" maxlength="4" placeholder="ABCD" inputmode="text" autocapitalize="characters" spellcheck="false" aria-label="Código de sala">
@@ -140,7 +147,7 @@
       <div id="online-espera" class="oculto">
         <p>Dile a tu amigo que entre a <b>En línea</b> y escriba este código:</p>
         <div id="codigo-sala" class="codigo">----</div>
-        <button id="btn-copiar" class="btn sec">📋 Copiar código</button>
+        <button id="btn-copiar" class="btn sec">Copiar código</button>
         <p class="estado"><span class="punto"></span> Esperando a tu rival…</p>
       </div>
       <p id="online-error" class="error oculto" role="alert"></p>
@@ -159,11 +166,11 @@
       <div id="carga-error" class="oculto">
         <p class="error" id="carga-error-texto"></p>
         <div class="botones">
-          <button id="btn-reintentar" class="btn">🔄 Reintentar</button>
-          <button id="btn-sin-camara" class="btn sec">👆 Jugar sin cámara</button>
+          <button id="btn-reintentar" class="btn">Reintentar</button>
+          <button id="btn-sin-camara" class="btn sec">Jugar sin cámara</button>
         </div>
       </div>
-      <button class="btn-link" data-menu>Volver al menú</button>
+      <button class="btn-link" data-menu>Volver al álbum</button>
     </div>
   </section>
 
@@ -184,21 +191,21 @@
       </div>
     </div>
     <div class="lobby-centro">
-      <h2 id="lobby-titulo">¡Muestra tu mano! ✋</h2>
+      <h2 id="lobby-titulo">Muestra tu mano</h2>
       <p id="lobby-sub">Apunta con el dedo índice. Tu ficha seguirá a tu dedo.</p>
-      <p class="lobby-tip">💡 Buena luz y la mano a 40–70 cm de la cámara</p>
-      <button id="btn-empezar-ya" class="btn sec">Empezar ya ▶</button>
+      <p class="lobby-tip">Con buena luz y la mano a 40–70 cm de la cámara.</p>
+      <button id="btn-empezar-ya" class="btn sec">Empezar ya</button>
     </div>
   </section>
 
   <!-- ================= PAUSA ================= -->
   <section id="p-pausa" class="pantalla modal">
     <div class="tarjeta centro">
-      <h2>⏸ Pausa</h2>
+      <h2>Pausa</h2>
       <div class="botones col">
-        <button id="btn-continuar" class="btn grande">▶ Continuar</button>
-        <button id="btn-reiniciar" class="btn sec">🔄 Reiniciar partido</button>
-        <button class="btn sec" data-menu>🏠 Menú principal</button>
+        <button id="btn-continuar" class="btn grande">Continuar</button>
+        <button id="btn-reiniciar" class="btn sec">Reiniciar partido</button>
+        <button class="btn sec" data-menu>Volver al álbum</button>
       </div>
     </div>
   </section>
@@ -209,8 +216,8 @@
       <h2>¿Salir del partido?</h2>
       <p class="sub-tarjeta">En línea el partido no se puede pausar.</p>
       <div class="botones col">
-        <button id="btn-seguir" class="btn grande">⚽ Seguir jugando</button>
-        <button class="btn sec" data-menu>🚪 Salir</button>
+        <button id="btn-seguir" class="btn grande">Seguir jugando</button>
+        <button class="btn sec" data-menu>Salir</button>
       </div>
     </div>
   </section>
@@ -223,8 +230,8 @@
       <div class="fin-marcador"><span class="c0" id="fin-g0">5</span><span>-</span><span class="c1" id="fin-g1">3</span></div>
       <p class="sub-tarjeta" id="fin-sub"></p>
       <div class="botones col">
-        <button id="btn-revancha" class="btn grande">🔁 Revancha</button>
-        <button class="btn sec" data-menu>🏠 Menú principal</button>
+        <button id="btn-revancha" class="btn grande">Revancha</button>
+        <button class="btn sec" data-menu>Volver al álbum</button>
       </div>
     </div>
   </section>
@@ -235,22 +242,22 @@
       <h2 id="alerta-titulo">Aviso</h2>
       <p class="sub-tarjeta" id="alerta-texto"></p>
       <div class="botones col">
-        <button class="btn grande" data-menu>🏠 Menú principal</button>
+        <button class="btn grande" data-menu>Volver al álbum</button>
       </div>
     </div>
   </section>
 
   <!-- Scripts en orden: configuración → utilidades → módulos → app -->
-  <script src="js/config.js?v=1.1"></script>
-  <script src="js/utilidades.js?v=1.1"></script>
-  <script src="js/audio/sonidos.js?v=1.1"></script>
-  <script src="js/juego/fisica.js?v=1.1"></script>
-  <script src="js/juego/cpu.js?v=1.1"></script>
-  <script src="js/entrada/camara.js?v=1.1"></script>
-  <script src="js/entrada/hand-tracker.js?v=1.1"></script>
-  <script src="js/entrada/puntero.js?v=1.1"></script>
-  <script src="js/render/render-pantalla.js?v=1.1"></script>
-  <script src="js/red/red.js?v=1.1"></script>
-  <script src="js/app.js?v=1.1"></script>
+  <script src="js/config.js?v=1.2"></script>
+  <script src="js/utilidades.js?v=1.2"></script>
+  <script src="js/audio/sonidos.js?v=1.2"></script>
+  <script src="js/juego/fisica.js?v=1.2"></script>
+  <script src="js/juego/cpu.js?v=1.2"></script>
+  <script src="js/entrada/camara.js?v=1.2"></script>
+  <script src="js/entrada/hand-tracker.js?v=1.2"></script>
+  <script src="js/entrada/puntero.js?v=1.2"></script>
+  <script src="js/render/render-pantalla.js?v=1.2"></script>
+  <script src="js/red/red.js?v=1.2"></script>
+  <script src="js/app.js?v=1.2"></script>
 </body>
 </html>

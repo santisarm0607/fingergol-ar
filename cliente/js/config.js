@@ -23,6 +23,7 @@ FG.config = {
 
   // --- Figuras: la que eliges aparece en tu ficha y en la punta de tu dedo índice ---
   FIGURAS: ['😎', '👽', '🐯', '🦖', '🐸', '🦊', '🐼', '🦁', '🐙', '⚡'],
+  FIGURAS_NOMBRES: ['Gafas', 'Marciano', 'Tigre', 'Rex', 'Rana', 'Zorro', 'Panda', 'León', 'Pulpo', 'Rayo'],
   FIGURA_CPU: '🤖',
 
   // --- Servidor en línea ------------------------------------
@@ -40,8 +41,8 @@ FG.config = {
   },
 
   EQUIPOS: [
-    { color: '#2ec5ff', oscuro: '#0b6e9c', nombre: 'AZUL' },
-    { color: '#ff4d6d', oscuro: '#a3183a', nombre: 'ROJO' }
+    { color: '#2f7cf6', oscuro: '#123f8f', nombre: 'AZUL' },
+    { color: '#ef3b3b', oscuro: '#8f1620', nombre: 'ROJO' }
   ],
 
   GOLES_POR_DEFECTO: 5,

@@ -71,10 +71,14 @@
         $('[data-modo="online"]').classList.add('deshabilitado');
       }
 
-      // botones de figuras (J1 y J2)
-      $$('.segmentos.figuras').forEach((seg) => {
-        seg.innerHTML = C.FIGURAS.map((f) => `<button data-valor="${f}" aria-label="Figura ${f}">${f}</button>`).join('');
-      });
+      // la colección de láminas (figuras)
+      this.jActivo = 0;
+      $('#coleccion').innerHTML = C.FIGURAS.map(
+        (f, i) =>
+          `<button class="lamina" data-fig="${f}" aria-label="Lámina ${i + 1}: ${C.FIGURAS_NOMBRES[i]}">` +
+          `<span class="lamina-num">${i + 1}</span><span class="lamina-fig">${f}</span>` +
+          `<span class="lamina-nombre">${C.FIGURAS_NOMBRES[i]}</span><span class="lamina-marca"></span></button>`
+      ).join('');
 
       this.conectarUI();
       this.refrescarAjustes();
@@ -97,6 +101,30 @@
           this.sonidos.boton();
           this.refrescarAjustes();
         });
+      });
+
+      // álbum: tocar un puesto (J1/J2) y luego una lámina para pegarla ahí
+      $$('.hueco').forEach((h) =>
+        h.addEventListener('click', () => {
+          this.jActivo = Number(h.dataset.j);
+          this.sonidos.activar();
+          this.sonidos.boton();
+          this.refrescarAjustes();
+        })
+      );
+      $('#coleccion').addEventListener('click', (ev) => {
+        const b = ev.target.closest('[data-fig]');
+        if (!b) return;
+        const clave = 'fig' + this.jActivo;
+        this.ajustes[clave] = b.dataset.fig;
+        U.guardar(clave, b.dataset.fig);
+        this.sonidos.activar();
+        this.sonidos.boton();
+        this.refrescarAjustes();
+        const lamina = $(`.hueco[data-j="${this.jActivo}"] .hueco-lamina`);
+        lamina.classList.remove('pegada');
+        void lamina.offsetWidth; // reinicia la animación
+        lamina.classList.add('pegada');
       });
 
       $$('[data-menu]').forEach((b) => b.addEventListener('click', () => this.irAlMenu()));
@@ -178,8 +206,17 @@
         );
       });
       const conManos = this.ajustes.control === 'manos';
-      $('#resumen-ajustes').textContent =
-        (conManos ? '✋ Manos' : '👆 Táctil') + ' · ' + this.ajustes.fig0 + ' ' + this.ajustes.fig1 + ' · ' + this.ajustes.goles + ' goles';
+      $('#resumen-ajustes').textContent = (conManos ? 'Con la mano' : 'Con mouse') + ', a ' + this.ajustes.goles + ' goles';
+      // álbum: figura pegada en cada puesto y qué lámina usa cada jugador
+      [0, 1].forEach((j) => {
+        $('#fig-j' + j).textContent = this.ajustes['fig' + j];
+        $(`.hueco[data-j="${j}"]`).classList.toggle('activo', this.jActivo === j);
+      });
+      $$('#coleccion .lamina').forEach((b) => {
+        const usos = [0, 1].filter((j) => this.ajustes['fig' + j] === b.dataset.fig).map((j) => 'J' + (j + 1));
+        b.classList.toggle('en-uso', usos.length > 0);
+        b.querySelector('.lamina-marca').textContent = usos.join(' ');
+      });
     },
 
     /* ====================== PANTALLAS ====================== */
