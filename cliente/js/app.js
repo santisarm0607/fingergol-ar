@@ -237,6 +237,11 @@
     elegirModo(modo) {
       this.sonidos.activar();
       this.sonidos.boton();
+      // Modo "Pantalla + celulares": tiene su propia página
+      if (modo === 'pantalla') {
+        location.href = 'pantalla.html';
+        return;
+      }
       if (modo === 'online') {
         if (C.MODO_DEMO) {
           this.aviso('El modo en línea necesita el servidor del juego. Mira el README del proyecto.', 4000);

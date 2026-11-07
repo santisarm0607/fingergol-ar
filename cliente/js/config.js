@@ -42,6 +42,11 @@ FG.config = {
   // 'wss://mi-fingergol.onrender.com/ws'
   SERVIDOR_URL: null,
 
+  // --- Modo "Pantalla + celulares" (PeerJS) ----------------
+  // null = usa el servidor gratis de PeerJS (0.peerjs.com).
+  // Para usar uno propio: { host: 'mi-servidor.com', port: 443, path: '/', secure: true }
+  PEER_OPCIONES: null,
+
   // --- Futbolito (unidades del juego: 1 unidad ≈ 2 mm con marcador de 10 cm) ---
   CANCHA: {
     ancho: 160,      // largo (de arco a arco)

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#070b1a">
+  <title>FingerGol AR — Jugador</title>
+  <link rel="icon" href="assets/icono.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/estilos.css">
+  <link rel="stylesheet" href="css/fiesta.css">
+</head>
+<body class="fiesta-control">
+
+  <a id="demo-volver" class="btn-icono fiesta-volver oculto" href="pantalla.html" aria-label="Volver a la pantalla">←</a>
+  <header class="control-logo">Finger<span>Gol</span> <em>AR</em></header>
+
+  <!-- Escribir el código a mano -->
+  <section class="vista" id="v-codigo">
+    <h2>📱 Únete a la pantalla</h2>
+    <p class="sub-tarjeta">Escribe el código de 4 letras que aparece en la pantalla.</p>
+    <form id="form-codigo" autocomplete="off">
+      <input id="input-codigo" class="input-codigo" maxlength="4" inputmode="text" autocapitalize="characters"
+             placeholder="ABCD" aria-label="Código de sala">
+      <button class="btn grande" type="submit">Unirme ⚽</button>
+    </form>
+    <p class="aviso-codigo" id="aviso-codigo" aria-live="polite"></p>
+  </section>
+
+  <!-- Conectando -->
+  <section class="vista" id="v-conectando">
+    <div class="girando" aria-hidden="true"></div>
+    <h2 id="txt-conectando">Conectando…</h2>
+  </section>
+
+  <!-- Conectado -->
+  <section class="vista" id="v-listo">
+    <div class="listo-ico">✌️</div>
+    <p class="listo-txt">Conectado como</p>
+    <h2 class="listo-equipo" id="listo-equipo">AZUL</h2>
+    <p class="listo-sala" id="listo-sala"></p>
+    <p class="sub-tarjeta">Mira la pantalla grande. En la siguiente parte aquí se encenderá la cámara
+      y tus dedos <b>índice</b> y <b>medio</b> serán las piernas de tu jugador.</p>
+  </section>
+
+  <!-- Error -->
+  <section class="vista" id="v-error">
+    <div class="listo-ico">⚠️</div>
+    <h2 id="error-titulo">Algo salió mal</h2>
+    <p class="sub-tarjeta" id="error-texto"></p>
+    <div class="botones col">
+      <button class="btn grande" id="btn-reconectar">🔄 Reconectar</button>
+      <button class="btn sec" id="btn-otro-codigo">⌨️ Escribir otro código</button>
+    </div>
+  </section>
+
+  <script src="js/config.js"></script>
+  <script src="js/utilidades.js"></script>
+  <script src="js/lib/peerjs.min.js"></script>
+  <script src="js/fiesta/enlace.js"></script>
+  <script src="js/fiesta/control.js"></script>
+</body>
+</html>
