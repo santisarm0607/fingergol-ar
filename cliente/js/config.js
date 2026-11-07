@@ -21,11 +21,6 @@ FG.config = {
   MODELO_MANO:
     'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
 
-  // --- Figuras: la que eliges aparece en tu ficha y en la punta de tu dedo índice ---
-  FIGURAS: ['😎', '👽', '🐯', '🦖', '🐸', '🦊', '🐼', '🦁', '🐙', '⚡'],
-  FIGURAS_NOMBRES: ['Gafas', 'Marciano', 'Tigre', 'Rex', 'Rana', 'Zorro', 'Panda', 'León', 'Pulpo', 'Rayo'],
-  FIGURA_CPU: '🤖',
-
   // --- Servidor en línea ------------------------------------
   // null = usa el mismo servidor que entrega la página (lo normal).
   // Si subes el cliente a otro hosting, pon aquí la URL, ej:
@@ -41,8 +36,8 @@ FG.config = {
   },
 
   EQUIPOS: [
-    { color: '#2f7cf6', oscuro: '#123f8f', nombre: 'AZUL' },
-    { color: '#ef3b3b', oscuro: '#8f1620', nombre: 'ROJO' }
+    { color: '#22e4ff', oscuro: '#075e74', nombre: 'AZUL' },
+    { color: '#ff2e93', oscuro: '#7d0b47', nombre: 'ROJO' }
   ],
 
   GOLES_POR_DEFECTO: 5,

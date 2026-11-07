@@ -17,7 +17,7 @@
       'La cámara solo funciona si abres el juego desde <b>https://</b> o desde <b>localhost</b>. Ejecuta <code>npm start</code> y entra a <b>http://localhost:3000</b>.',
     'sin-soporte': 'Este navegador no deja usar la cámara. Prueba con Chrome, Edge o Safari actualizados.',
     permiso:
-      'No tenemos permiso para usar la cámara. Toca el candado 🔒 junto a la dirección, permite la cámara y pulsa <b>Reintentar</b>.',
+      'No tenemos permiso para usar la cámara. Toca el candado junto a la dirección, permite la cámara y pulsa <b>Reintentar</b>.',
     'sin-camara': 'No encontramos ninguna cámara conectada a este dispositivo.',
     ocupada: 'Otra app está usando la cámara (Zoom, Meet, otra pestaña…). Ciérrala y pulsa <b>Reintentar</b>.',
     mediapipe: 'No se pudo descargar el detector de manos (MediaPipe). Revisa tu conexión a internet.',
@@ -25,11 +25,20 @@
     desconocido: 'Algo falló al encender la cámara.'
   };
 
+  // Íconos dibujados con SVG (trazo neón, sin emojis)
+  const svg = (d, extra = '') =>
+    `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"${extra}>${d}</svg>`;
+  const ICONOS = {
+    pausa: svg('<path d="M8 5v14M16 5v14"/>'),
+    cerrar: svg('<path d="M6 6l12 12M18 6L6 18"/>'),
+    sonido: svg('<path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>'),
+    mudo: svg('<path d="M4 10v4h4l5 4V6L8 10z"/><path d="M17 10l4 4M21 10l-4 4"/>'),
+    copa: svg('<path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8"/>', ' class="copa"')
+  };
+
   const App = {
     ajustes: {
       control: U.leer('control', 'manos'),
-      fig0: U.leer('fig0', '😎'),
-      fig1: U.leer('fig1', '👽'),
       goles: U.leer('goles', C.GOLES_POR_DEFECTO),
       dificultad: U.leer('dificultad', 'normal')
     },
@@ -71,14 +80,6 @@
         $('[data-modo="online"]').classList.add('deshabilitado');
       }
 
-      // la colección de láminas (figuras)
-      this.jActivo = 0;
-      $('#coleccion').innerHTML = C.FIGURAS.map(
-        (f, i) =>
-          `<button class="lamina" data-fig="${f}" aria-label="Lámina ${i + 1}: ${C.FIGURAS_NOMBRES[i]}">` +
-          `<span class="lamina-num">${i + 1}</span><span class="lamina-fig">${f}</span>` +
-          `<span class="lamina-nombre">${C.FIGURAS_NOMBRES[i]}</span><span class="lamina-marca"></span></button>`
-      ).join('');
 
       this.conectarUI();
       this.refrescarAjustes();
@@ -103,30 +104,6 @@
         });
       });
 
-      // álbum: tocar un puesto (J1/J2) y luego una lámina para pegarla ahí
-      $$('.hueco').forEach((h) =>
-        h.addEventListener('click', () => {
-          this.jActivo = Number(h.dataset.j);
-          this.sonidos.activar();
-          this.sonidos.boton();
-          this.refrescarAjustes();
-        })
-      );
-      $('#coleccion').addEventListener('click', (ev) => {
-        const b = ev.target.closest('[data-fig]');
-        if (!b) return;
-        const clave = 'fig' + this.jActivo;
-        this.ajustes[clave] = b.dataset.fig;
-        U.guardar(clave, b.dataset.fig);
-        this.sonidos.activar();
-        this.sonidos.boton();
-        this.refrescarAjustes();
-        const lamina = $(`.hueco[data-j="${this.jActivo}"] .hueco-lamina`);
-        lamina.classList.remove('pegada');
-        void lamina.offsetWidth; // reinicia la animación
-        lamina.classList.add('pegada');
-      });
-
       $$('[data-menu]').forEach((b) => b.addEventListener('click', () => this.irAlMenu()));
       $$('[data-volver]').forEach((b) => b.addEventListener('click', () => this.irAlMenu()));
 
@@ -148,9 +125,9 @@
       $('#btn-sonido').addEventListener('click', () => {
         this.sonidos.activar();
         const mudo = this.sonidos.alternar();
-        $('#btn-sonido').textContent = mudo ? '🔇' : '🔊';
+        $('#btn-sonido').innerHTML = mudo ? ICONOS.mudo : ICONOS.sonido;
       });
-      $('#btn-sonido').textContent = this.sonidos.silencio ? '🔇' : '🔊';
+      $('#btn-sonido').innerHTML = this.sonidos.silencio ? ICONOS.mudo : ICONOS.sonido;
       const btnPantalla = $('#btn-pantalla');
       if (!document.fullscreenEnabled) btnPantalla.classList.add('oculto');
       btnPantalla.addEventListener('click', () => {
@@ -184,7 +161,7 @@
       $('#btn-copiar').addEventListener('click', async () => {
         try {
           await navigator.clipboard.writeText($('#codigo-sala').textContent);
-          this.aviso('Código copiado 📋');
+          this.aviso('Código copiado');
         } catch (e) {
           this.aviso('Copia el código a mano: ' + $('#codigo-sala').textContent);
         }
@@ -207,16 +184,6 @@
       });
       const conManos = this.ajustes.control === 'manos';
       $('#resumen-ajustes').textContent = (conManos ? 'Con la mano' : 'Con mouse') + ', a ' + this.ajustes.goles + ' goles';
-      // álbum: figura pegada en cada puesto y qué lámina usa cada jugador
-      [0, 1].forEach((j) => {
-        $('#fig-j' + j).textContent = this.ajustes['fig' + j];
-        $(`.hueco[data-j="${j}"]`).classList.toggle('activo', this.jActivo === j);
-      });
-      $$('#coleccion .lamina').forEach((b) => {
-        const usos = [0, 1].filter((j) => this.ajustes['fig' + j] === b.dataset.fig).map((j) => 'J' + (j + 1));
-        b.classList.toggle('en-uso', usos.length > 0);
-        b.querySelector('.lamina-marca').textContent = usos.join(' ');
-      });
     },
 
     /* ====================== PANTALLAS ====================== */
@@ -329,7 +296,7 @@
         if (token !== this.tokenPrep) return false;
         if (paso) paso.dataset.estado = 'fallo';
         $('#carga-spinner').classList.add('oculto');
-        $('#carga-titulo').textContent = 'No pudimos empezar 😕';
+        $('#carga-titulo').textContent = 'No pudimos empezar';
         $('#carga-error-texto').innerHTML = MENSAJES_ERROR[e.codigo] || MENSAJES_ERROR.desconocido;
         $('#carga-error').classList.remove('oculto');
         return false;
@@ -343,7 +310,7 @@
       document.body.classList.toggle('con-camara', conCamaraPantalla);
       this.renderer.conCamara = conCamaraPantalla;
       $('#hud').classList.remove('oculto');
-      $('#btn-pausa').textContent = this.modo === 'online' ? '✕' : '⏸';
+      $('#btn-pausa').innerHTML = this.modo === 'online' ? ICONOS.cerrar : ICONOS.pausa;
       this.actualizarNombres();
       this.actualizarMarcador();
       this.pedirWakeLock();
@@ -362,7 +329,7 @@
         $(`#lado${lado}-nombre`).textContent = nombres[lado];
         $(`#lado${lado}`).classList.toggle('remoto', !this.humanos.includes(lado));
       });
-      $('#lobby-titulo').textContent = this.controlActual === 'manos' ? '¡Muestra tu mano! ✋' : 'Esperando a tu rival…';
+      $('#lobby-titulo').textContent = this.controlActual === 'manos' ? 'Muestra tu mano' : 'Esperando a tu rival…';
       $('#lobby-sub').textContent =
         this.controlActual === 'manos'
           ? this.humanos.length === 2
@@ -399,7 +366,7 @@
           barra.style.width = listoOtro ? '100%' : '0%';
           panel.classList.toggle('listo', listoOtro);
           estado.textContent =
-            this.modo === 'cpu' ? '🤖 Lista para jugar' : this.rivalListo ? 'Rival listo ✓' : 'Esperando al rival…';
+            this.modo === 'cpu' ? 'La máquina está lista' : this.rivalListo ? 'Rival listo ✓' : 'Esperando al rival…';
         }
       });
 
@@ -466,7 +433,6 @@
       $('#fin-g0').textContent = m[0];
       $('#fin-g1').textContent = m[1];
       const mio = this.humanos.includes(ganador);
-      let icono = '🏆';
       let titulo;
       let sub;
       if (this.modo === 'local') {
@@ -474,14 +440,12 @@
         sub = '¡Qué partidazo! ¿Otra?';
       } else if (this.modo === 'cpu') {
         titulo = mio ? '¡Le ganaste a la máquina!' : 'Ganó la máquina';
-        icono = mio ? '🏆' : '🤖';
         sub = mio ? 'Prueba la dificultad “Difícil” en Ajustes.' : '¿La revancha?';
       } else {
         titulo = mio ? '¡Ganaste!' : 'Ganó tu rival';
-        icono = mio ? '🏆' : '😅';
         sub = this.rol === 'invitado' ? 'La revancha la inicia quien creó la sala.' : '';
       }
-      $('#fin-icono').textContent = icono;
+      $('#fin-icono').innerHTML = this.modo === 'local' || mio ? ICONOS.copa : '';
       $('#fin-titulo').textContent = titulo;
       $('#fin-sub').textContent = sub;
       $('#fin-titulo').style.color = C.EQUIPOS[ganador].color;
@@ -536,12 +500,6 @@
       if (this.modo === 'local') return ['1', '2'];
       if (this.modo === 'cpu') return ['TÚ', 'CPU'];
       return this.rol === 'anfitrion' ? ['TÚ', '2'] : ['1', 'TÚ'];
-    },
-    /** Figura de cada lado: la máquina siempre es el robot. */
-    figuras() {
-      const f = [this.ajustes.fig0, this.ajustes.fig1];
-      if (this.modo === 'cpu') f[1] = C.FIGURA_CPU;
-      return f;
     },
     actualizarNombres() {
       const n = this.nombresCortos();
@@ -629,10 +587,7 @@
       for (const lado of [0, 1]) {
         const e = res[lado];
         if (e) {
-          if (e.dib) {
-            e.dib.color = C.EQUIPOS[lado].color;
-            e.dib.figura = this.figuras()[lado];
-          }
+          if (e.dib) e.dib.color = C.EQUIPOS[lado].color;
           if (this.tSinEntrada[lado] > 0.4) this.filtros[lado].reiniciar();
           this.tSinEntrada[lado] = 0;
           const p = e.mano ? this.filtros[lado].filtrar(e.x, e.y, t) : { x: e.x, y: e.y };
@@ -708,7 +663,6 @@
         manos: this.manosDibujo,
         etiquetas: this._etiquetas,
         locales: this.humanos,
-        figuras: this.figuras(),
         avisos: this.controlActual === 'manos' && (this.fase === 'juego' || this.fase === 'lobby')
       });
     },
@@ -728,7 +682,7 @@
       p.actualizar(dt);
       p.sacarEventos();
       this.renderer.actualizarEfectos(dt);
-      this.renderer.dibujar(p, { etiquetas: ['', ''], figuras: [this.ajustes.fig0, this.ajustes.fig1], avisos: false });
+      this.renderer.dibujar(p, { etiquetas: ['1', '2'], avisos: false });
     },
 
     procesarEventos(eventos) {
@@ -812,7 +766,7 @@
       const sinManos = !this.manosDibujo.length;
       if (brillo < 60 && sinManos && ahora - (this.tAvisoLuz || 0) > 10000) {
         this.tAvisoLuz = ahora;
-        this.aviso('💡 Hay poca luz: acércate a una lámpara o ventana para que la cámara vea tu mano.', 4000);
+        this.aviso('Hay poca luz: acércate a una lámpara o ventana para que la cámara vea tu mano.', 4000);
       }
     },
 
@@ -864,7 +818,7 @@
       });
       red.on('revancha', () => {
         if (this.rol === 'anfitrion' && this.fase === 'fin') {
-          this.aviso('Tu rival pidió la revancha 🔁');
+          this.aviso('Tu rival pidió la revancha');
           this.mostrar(null);
           this.reiniciarPartido();
         }
@@ -920,7 +874,7 @@
         this.red.cerrar();
         this.red = null;
       }
-      this.alerta('Fin de la partida 😕', texto);
+      this.alerta('Fin de la partida', texto);
     },
 
     enviarEstado(ahora) {

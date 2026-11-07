@@ -1,5 +1,5 @@
 /* ============================================================
-   Render "Modo Pantalla": dibuja la cancha encima del video de la
+   Render: dibuja la mesa de air hockey neón encima del video de la
    cámara (en espejo, como un espejo real) usando Canvas 2D.
    También convierte coordenadas: video -> pantalla -> cancha.
    Si la pantalla está vertical, la cancha se gira 90°.
@@ -9,7 +9,6 @@
   const C = FG.config;
   const F = C.CANCHA;
   const U = FG.util;
-  const FUENTE_EMOJI = '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
 
   function rgba(hex, a) {
     const n = parseInt(hex.slice(1), 16);
@@ -17,33 +16,67 @@
   }
   FG.util.rgba = rgba;
 
-  /** Dibuja la cancha en coordenadas de cancha. */
+  /**
+   * Dibuja la mesa de air hockey en coordenadas de cancha:
+   * superficie con los huequitos del aire, líneas de neón y arcos.
+   */
   FG.dibujarCampo = function (ctx, op = {}) {
     const W = F.ancho;
     const H = F.alto;
     const fondo = F.fondoArco;
     const y1 = (H - F.arco) / 2;
     const y2 = y1 + F.arco;
-    const a = op.transparente ? 0.4 : 1;
+    const a = op.transparente ? 0.55 : 1;
+    const [c0, c1] = [C.EQUIPOS[0].color, C.EQUIPOS[1].color];
 
-    // césped a franjas
-    const franjas = 10;
-    for (let i = 0; i < franjas; i++) {
-      ctx.fillStyle = i % 2 ? `rgba(36,156,84,${a})` : `rgba(27,134,70,${a})`;
-      ctx.fillRect((i * W) / franjas, 0, W / franjas + 0.05, H);
+    // superficie de la mesa
+    ctx.fillStyle = `rgba(21,16,74,${a})`;
+    ctx.fillRect(0, 0, W, H);
+    // huequitos por donde sale el aire
+    ctx.fillStyle = `rgba(140,150,255,${0.22 * a + 0.05})`;
+    for (let x = 4; x < W; x += 5) {
+      for (let y = 4; y < H; y += 5) {
+        ctx.fillRect(x - 0.3, y - 0.3, 0.6, 0.6);
+      }
     }
-    // cada mitad con un toque del color de su equipo
-    ctx.fillStyle = rgba(C.EQUIPOS[0].color, 0.08);
-    ctx.fillRect(0, 0, W / 2, H);
-    ctx.fillStyle = rgba(C.EQUIPOS[1].color, 0.08);
-    ctx.fillRect(W / 2, 0, W / 2, H);
 
-    // líneas
-    ctx.strokeStyle = 'rgba(255,255,255,0.92)';
-    ctx.fillStyle = 'rgba(255,255,255,0.92)';
-    ctx.lineWidth = 0.6;
+    const neon = (color, ancho, brillo) => {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = ancho;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = brillo;
+    };
     ctx.lineJoin = 'round';
-    ctx.strokeRect(0, 0, W, H);
+    ctx.lineCap = 'round';
+
+    // cada mitad con el neón de su equipo
+    [[0, c0], [1, c1]].forEach(([lado, color]) => {
+      const x0 = lado === 0 ? 0 : W;
+      const s = lado === 0 ? 1 : -1;
+      neon(color, 0.7, 6);
+      // banda (borde de la mesa)
+      ctx.beginPath();
+      ctx.moveTo(W / 2, 0);
+      ctx.lineTo(x0, 0);
+      ctx.lineTo(x0, y1);
+      ctx.moveTo(x0, y2);
+      ctx.lineTo(x0, H);
+      ctx.lineTo(W / 2, H);
+      ctx.stroke();
+      // semicírculo del área
+      ctx.beginPath();
+      ctx.arc(x0, H / 2, 24, -Math.PI / 2, Math.PI / 2, lado === 1);
+      ctx.stroke();
+      // línea de tiro
+      neon(rgba(color, 0.45), 0.35, 0);
+      ctx.beginPath();
+      ctx.moveTo(x0 + s * 40, 3);
+      ctx.lineTo(x0 + s * 40, H - 3);
+      ctx.stroke();
+    });
+
+    // centro: línea y círculo en blanco
+    neon('rgba(235,240,255,0.9)', 0.5, 5);
     ctx.beginPath();
     ctx.moveTo(W / 2, 0);
     ctx.lineTo(W / 2, H);
@@ -51,56 +84,17 @@
     ctx.beginPath();
     ctx.arc(W / 2, H / 2, 13, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(W / 2, H / 2, 0.9, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.shadowBlur = 0;
 
-    // áreas grande y chica, punto penal y medialuna
-    ctx.strokeRect(0, H / 2 - 25, 22, 50);
-    ctx.strokeRect(W - 22, H / 2 - 25, 22, 50);
-    ctx.strokeRect(0, H / 2 - 13, 8, 26);
-    ctx.strokeRect(W - 8, H / 2 - 13, 8, 26);
-    [[15, 0], [W - 15, Math.PI]].forEach(([x, ang]) => {
-      ctx.beginPath();
-      ctx.arc(x, H / 2, 0.7, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(x, H / 2, 11, ang - 0.88, ang + 0.88);
-      ctx.stroke();
-    });
-    // tiros de esquina
-    [[0, 0, 0], [W, 0, Math.PI / 2], [W, H, Math.PI], [0, H, -Math.PI / 2]].forEach(([x, y, ang]) => {
-      ctx.beginPath();
-      ctx.arc(x, y, 2.5, ang, ang + Math.PI / 2);
-      ctx.stroke();
-    });
-
-    // arcos con red
+    // arcos: ranuras iluminadas
     [0, 1].forEach((lado) => {
+      const color = C.EQUIPOS[lado].color;
       const x0 = lado === 0 ? -fondo : W;
-      ctx.fillStyle = rgba(C.EQUIPOS[lado].color, op.transparente ? 0.28 : 0.35);
+      ctx.fillStyle = rgba(color, op.transparente ? 0.25 : 0.18);
       ctx.fillRect(x0, y1, fondo, F.arco);
-      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-      ctx.lineWidth = 0.22;
-      ctx.beginPath();
-      for (let x = x0; x <= x0 + fondo + 0.01; x += 1.75) {
-        ctx.moveTo(x, y1);
-        ctx.lineTo(x, y2);
-      }
-      for (let y = y1; y <= y2 + 0.01; y += 1.75) {
-        ctx.moveTo(x0, y);
-        ctx.lineTo(x0 + fondo, y);
-      }
-      ctx.stroke();
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 0.75;
+      neon(color, 0.9, 8);
       ctx.strokeRect(x0, y1, fondo, F.arco);
-      ctx.fillStyle = '#ffffff';
-      [y1, y2].forEach((y) => {
-        ctx.beginPath();
-        ctx.arc(lado === 0 ? 0 : W, y, 1.3, 0, Math.PI * 2);
-        ctx.fill();
-      });
+      ctx.shadowBlur = 0;
     });
   };
 
@@ -115,7 +109,7 @@
       this.estela = [];
       this.temblor = 0;
       this.destello = null;
-      this.golpes = [0, 0];   // "rebote" de cada figura al pegarle al balón (1 → 0)
+      this.golpes = [0, 0];   // "rebote" de cada mazo al pegarle al disco (1 → 0)
       this.fuego = null;      // estela de color después de un tiro fuerte
       this.ajustar();
       window.addEventListener('resize', () => this.ajustar());
@@ -219,7 +213,7 @@
       this.temblor = 14;
       this.destello = { color: C.EQUIPOS[equipo].color, vida: 0.5 };
     }
-    /** La figura del jugador "salta" al pegarle al balón. */
+    /** El mazo del jugador "salta" al pegarle al disco. */
     golpear(lado, fuerza) {
       this.golpes[lado] = 1;
       if (fuerza > 190) this.fuego = { color: C.EQUIPOS[lado].color, vida: 0.8 };
@@ -333,40 +327,38 @@
       const perdido = !j.activo && esLocal && op.avisos;
       ctx.globalAlpha = perdido ? 0.45 : 1;
 
-      // sombra (la lámina está "pegada" sobre la cancha)
-      ctx.fillStyle = 'rgba(8,20,40,0.35)';
+      // mazo de air hockey visto desde arriba: anillo de neón, base y perilla
+      const r = j.r;
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
       ctx.beginPath();
-      ctx.arc(j.x + 0.8, j.y + 1.2, j.r * 1.05, 0, Math.PI * 2);
+      ctx.arc(j.x + 0.6, j.y + 1, r, 0, Math.PI * 2);
       ctx.fill();
-      // borde blanco de lámina
-      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = eq.color;
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = eq.oscuro;
       ctx.beginPath();
-      ctx.arc(j.x, j.y, j.r, 0, Math.PI * 2);
+      ctx.arc(j.x, j.y, r, 0, Math.PI * 2);
       ctx.fill();
-      // fondo del color del equipo
+      ctx.lineWidth = r * 0.16;
+      ctx.strokeStyle = eq.color;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      // anillo interior
+      ctx.lineWidth = 0.4;
+      ctx.strokeStyle = rgba(eq.color, 0.6);
+      ctx.beginPath();
+      ctx.arc(j.x, j.y, r * 0.66, 0, Math.PI * 2);
+      ctx.stroke();
+      // perilla (donde iría la mano)
+      const g = 1 + 0.25 * Math.sin(this.golpes[j.lado] * Math.PI);
       ctx.fillStyle = eq.color;
       ctx.beginPath();
-      ctx.arc(j.x, j.y, j.r * 0.82, 0, Math.PI * 2);
+      ctx.arc(j.x, j.y, r * 0.44 * g, 0, Math.PI * 2);
       ctx.fill();
-      // brillo de lámina (franja diagonal)
-      ctx.save();
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
       ctx.beginPath();
-      ctx.arc(j.x, j.y, j.r * 0.82, 0, Math.PI * 2);
-      ctx.clip();
-      ctx.fillStyle = 'rgba(255,255,255,0.18)';
-      ctx.beginPath();
-      ctx.moveTo(j.x - j.r, j.y - j.r * 0.2);
-      ctx.lineTo(j.x - j.r * 0.2, j.y - j.r);
-      ctx.lineTo(j.x + j.r * 0.15, j.y - j.r);
-      ctx.lineTo(j.x - j.r, j.y + j.r * 0.15);
-      ctx.closePath();
+      ctx.arc(j.x - r * 0.12, j.y - r * 0.14, r * 0.14, 0, Math.PI * 2);
       ctx.fill();
-      ctx.restore();
-      ctx.lineWidth = 0.45;
-      ctx.strokeStyle = eq.oscuro;
-      ctx.beginPath();
-      ctx.arc(j.x, j.y, j.r, 0, Math.PI * 2);
-      ctx.stroke();
 
       if (perdido) {
         ctx.globalAlpha = 0.9;
@@ -389,42 +381,27 @@
       const texto = op.etiquetas ? op.etiquetas[j.lado] : String(j.lado + 1);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      const figura = op.figuras && op.figuras[j.lado];
-      if (figura) {
-        // figura (emoji) encima de la ficha: se inclina al moverse y salta al patear
-        const g = this.golpes[j.lado];
-        const salto = 1 + 0.38 * Math.sin(g * Math.PI);
-        const inclina = U.clamp((this.rotado ? -j.vy : j.vx) / 500, -0.35, 0.35);
-        ctx.save();
-        ctx.translate(sx, sy);
-        ctx.rotate(inclina);
-        ctx.scale(salto, salto);
-        ctx.font = `${Math.max(16, rPx * 1.3)}px ${FUENTE_EMOJI}`;
-        ctx.fillText(figura, 0, rPx * 0.08);
-        ctx.restore();
-        if (texto) {
-          // nombre pequeño debajo de la ficha
-          ctx.font = `800 ${Math.max(10, rPx * 0.42)}px "Big Shoulders Display", system-ui, sans-serif`;
-          const ancho = ctx.measureText(texto).width + 12;
-          const y = sy + rPx + Math.max(9, rPx * 0.35);
-          ctx.fillStyle = rgba(C.EQUIPOS[j.lado].oscuro, 0.9);
-          ctx.beginPath();
-          if (ctx.roundRect) ctx.roundRect(sx - ancho / 2, y - 9, ancho, 18, 9);
-          else ctx.rect(sx - ancho / 2, y - 9, ancho, 18);
-          ctx.fill();
-          ctx.fillStyle = '#ffffff';
-          ctx.fillText(texto, sx, y + 1);
-        }
-      } else {
-        ctx.font = `800 ${Math.max(10, rPx * ((texto || '').length > 2 ? 0.55 : 0.8))}px "Big Shoulders Display", system-ui, sans-serif`;
+      if (texto) {
+        // nombre corto en una plaquita debajo del mazo
+        ctx.font = `700 ${Math.max(11, rPx * 0.46)}px "Rajdhani", system-ui, sans-serif`;
+        const ancho = ctx.measureText(texto).width + 12;
+        const y = sy + rPx + Math.max(10, rPx * 0.4);
+        ctx.fillStyle = 'rgba(12,9,46,0.85)';
+        ctx.strokeStyle = C.EQUIPOS[j.lado].color;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(sx - ancho / 2, y - 9, ancho, 18, 4);
+        else ctx.rect(sx - ancho / 2, y - 9, ancho, 18);
+        ctx.fill();
+        ctx.stroke();
         ctx.fillStyle = '#ffffff';
-        ctx.fillText(texto || String(j.lado + 1), sx, sy + rPx * 0.06);
+        ctx.fillText(texto, sx, y + 1);
       }
 
       const esLocal = !op.locales || op.locales.includes(j.lado);
       if (!j.activo && esLocal && op.avisos) {
-        ctx.font = `700 ${Math.max(12, rPx * 0.62)}px "Big Shoulders Display", system-ui, sans-serif`;
-        const msg = '✋ ¿Y tu mano?';
+        ctx.font = `700 ${Math.max(12, rPx * 0.62)}px "Rajdhani", system-ui, sans-serif`;
+        const msg = '¿Y tu mano?';
         const ancho = ctx.measureText(msg).width + 16;
         const y = sy - rPx - 22;
         ctx.fillStyle = 'rgba(10,14,30,0.85)';
@@ -437,68 +414,40 @@
       }
     }
 
+    /** El "balón" es un disco de air hockey que brilla. */
     dibujarBalon(b, partido) {
       const ctx = this.ctx;
-      // sombra
-      ctx.fillStyle = 'rgba(0,0,0,0.38)';
+      const color = this.fuego ? this.fuego.color : '#f4ff5a';
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
       ctx.beginPath();
-      ctx.ellipse(b.x + 0.7, b.y + 1.1, b.r, b.r * 0.85, 0, 0, Math.PI * 2);
+      ctx.arc(b.x + 0.5, b.y + 0.8, b.r, 0, Math.PI * 2);
       ctx.fill();
-      // esfera
-      const g = ctx.createRadialGradient(b.x - b.r * 0.35, b.y - b.r * 0.4, b.r * 0.1, b.x, b.y, b.r);
-      g.addColorStop(0, '#ffffff');
-      g.addColorStop(0.7, '#e9edf5');
-      g.addColorStop(1, '#a9b2c4');
-      ctx.fillStyle = g;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = '#1b1650';
       ctx.beginPath();
       ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
       ctx.fill();
-      // parches negros que "ruedan"
-      ctx.save();
+      ctx.lineWidth = b.r * 0.3;
+      ctx.strokeStyle = color;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      // marca que gira con el disco
+      ctx.strokeStyle = rgba(color, 0.8);
+      ctx.lineWidth = 0.45;
       ctx.beginPath();
-      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-      ctx.clip();
-      ctx.fillStyle = '#1b2233';
-      const giro = b.giro;
-      const desp = Math.sin(giro) * b.r * 0.35;
-      const ang = Math.atan2(b.vy, b.vx);
-      const cx = b.x + Math.cos(ang) * desp;
-      const cy = b.y + Math.sin(ang) * desp;
-      this.pentagono(cx, cy, b.r * 0.36, giro * 0.3);
-      for (let i = 0; i < 5; i++) {
-        const a = giro * 0.3 + (i * Math.PI * 2) / 5;
-        this.pentagono(cx + Math.cos(a) * b.r * 0.92, cy + Math.sin(a) * b.r * 0.92, b.r * 0.3, a);
-      }
-      ctx.restore();
-      ctx.lineWidth = 0.35;
-      ctx.strokeStyle = 'rgba(20,25,40,0.6)';
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      ctx.arc(b.x, b.y, b.r * 0.42, b.giro, b.giro + Math.PI * 1.2);
       ctx.stroke();
 
       // en la cuenta regresiva, un anillo marca el saque
       if (partido.estado === 'cuenta') {
-        ctx.strokeStyle = 'rgba(255,210,63,0.9)';
-        ctx.lineWidth = 0.6;
+        ctx.strokeStyle = 'rgba(244,255,90,0.85)';
+        ctx.lineWidth = 0.5;
         const p = 1 + 0.25 * Math.sin(performance.now() / 120);
         ctx.beginPath();
         ctx.arc(b.x, b.y, b.r * 1.9 * p, 0, Math.PI * 2);
         ctx.stroke();
       }
-    }
-
-    pentagono(x, y, r, rot) {
-      const ctx = this.ctx;
-      ctx.beginPath();
-      for (let i = 0; i < 5; i++) {
-        const a = rot + (i * Math.PI * 2) / 5 - Math.PI / 2;
-        const px = x + Math.cos(a) * r;
-        const py = y + Math.sin(a) * r;
-        if (i) ctx.lineTo(px, py);
-        else ctx.moveTo(px, py);
-      }
-      ctx.closePath();
-      ctx.fill();
     }
 
     /** m = { puntos: [[sx,sy] x21], color } ya convertidos a pantalla */
@@ -525,20 +474,15 @@
       });
       const punta = m.puntos[8];
       if (punta) {
+        // anillo de neón en la punta del índice: ahí está tu mazo
         ctx.strokeStyle = m.color;
-        ctx.lineWidth = 3;
+        ctx.shadowColor = m.color;
+        ctx.shadowBlur = 12;
+        ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.arc(punta[0], punta[1], m.figura ? 20 : 9, 0, Math.PI * 2);
+        ctx.arc(punta[0], punta[1], 14, 0, Math.PI * 2);
         ctx.stroke();
-        if (m.figura) {
-          // tu figura en la punta del dedo índice
-          ctx.fillStyle = rgba(m.color, 0.35);
-          ctx.fill();
-          ctx.font = `26px ${FUENTE_EMOJI}`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(m.figura, punta[0], punta[1] + 2);
-        }
+        ctx.shadowBlur = 0;
       }
     }
 
@@ -552,7 +496,7 @@
         const a = Math.min(1, t.vida / 0.35);
         const tam = Math.max(18, (this.campo.s || 5) * 5.2) * (avance < 0.15 ? 0.6 + avance * 2.7 : 1);
         ctx.globalAlpha = a;
-        ctx.font = `800 ${tam}px "Big Shoulders Display", system-ui, sans-serif`;
+        ctx.font = `800 ${tam}px "Rajdhani", system-ui, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.lineWidth = 5;
