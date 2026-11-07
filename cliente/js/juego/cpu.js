@@ -1,12 +1,10 @@
 /* ============================================================
    Rival controlado por la máquina (para jugar solo).
-   Decide hacia dónde camina su muñeco y cuándo patea;
-   el Andador (andador.js) mueve sus dos pies.
    Idea simple, como en el air hockey:
    1. Si el balón está en la otra mitad → defender su arco,
       calculando por dónde va a llegar el tiro.
    2. Si el balón está en su mitad y la máquina está DETRÁS del balón
-      (mirando al arco rival) → alinearse y patearlo hacia el arco.
+      (mirando al arco rival) → alinearse y empujarlo hacia el arco.
    3. Si está DELANTE del balón (lado equivocado) → rodearlo por un
       costado, sin tocarlo, para no meterse autogoles.
    ============================================================ */
@@ -15,9 +13,9 @@
   const { clamp } = FG.util;
 
   const NIVELES = {
-    facil: { vel: 70, reaccion: 0.3, error: 10, patada: 0.35 },
-    normal: { vel: 150, reaccion: 0.12, error: 3, patada: 0.8 },
-    dificil: { vel: 190, reaccion: 0.08, error: 1.2, patada: 1 }
+    facil: { vel: 85, reaccion: 0.28, error: 8, empuje: 3 },
+    normal: { vel: 150, reaccion: 0.12, error: 3, empuje: 7 },
+    dificil: { vel: 190, reaccion: 0.08, error: 1.2, empuje: 10 }
   };
 
   class CPU {
@@ -30,7 +28,6 @@
       this.y = j.y;
       this.deseo = { x: j.x, y: j.y };
       this.tPensar = 0;
-      this.patear = false;
     }
 
     actualizar(dt) {
@@ -38,7 +35,6 @@
       const j = this.p.jugadores[this.lado];
       if (this.tPensar <= 0) {
         this.tPensar = this.n.reaccion;
-        this.patear = false;
         const d = this.pensar();
         const [x, y] = this.p.limitar(j, d.x, d.y); // nunca apuntar fuera de su mitad
         this.deseo = { x, y };
@@ -54,14 +50,7 @@
         this.x += (dx / d) * paso;
         this.y += (dy / d) * paso;
       }
-      const patear = this.patear;
-      this.patear = false;
-      return { x: this.x, y: this.y, patear };
-    }
-
-    /** Decide patear si el balón está a tiro (con algo de azar según el nivel). */
-    quierePatear(dist) {
-      if (dist < 17 && Math.random() < this.n.patada) this.patear = true;
+      return { x: this.x, y: this.y };
     }
 
     pensar() {
@@ -100,7 +89,6 @@
       const balonDelante = (b.x - j.x) * dir > 0;
       if (balonDelante && b.vx * dir < -60) {
         const xTapar = (j.x - miArcoX) * dir > 30 ? miArcoX + dir * 30 : j.x;
-        this.quierePatear(Math.hypot(b.x - j.x, b.y - j.y)); // despejar si llega
         return { x: xTapar, y: clamp(cruce(xTapar) + err() * 0.5, P.y1 - 6, P.y2 + 6) };
       }
 
@@ -121,9 +109,7 @@
       // 2) detrás del balón → alinearse y empujar
       if (adelante < -contacto * 0.3) {
         if (Math.abs(lateral) < contacto * 0.7) {
-          // alineado: acercarse por detrás y patear hacia el arco
-          this.quierePatear(Math.hypot(b.x - j.x, b.y - j.y));
-          return { x: bx - ux * 7, y: by - uy * 7 };
+          return { x: bx + ux * this.n.empuje, y: by + uy * this.n.empuje };
         }
         return { x: bx - ux * (contacto + 3), y: by - uy * (contacto + 3) };
       }
