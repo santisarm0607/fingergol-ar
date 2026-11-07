@@ -67,6 +67,10 @@
 
       this.conectarUI();
       this.refrescarAjustes();
+
+      // En un celular, lo primero es unirse a una pantalla (modo Pantalla + celulares)
+      const esCelular = window.matchMedia('(pointer: coarse)').matches && Math.min(innerWidth, innerHeight) < 600;
+      if (esCelular) this.mostrar('p-celular');
       this._bucle = (t) => this.bucle(t);
       requestAnimationFrame(this._bucle);
     },
@@ -88,6 +92,7 @@
         });
       });
 
+      $('#btn-ver-menu').addEventListener('click', () => this.mostrar('p-inicio'));
       $$('[data-menu]').forEach((b) => b.addEventListener('click', () => this.irAlMenu()));
       $$('[data-ver-marcador]').forEach((b) =>
         b.addEventListener('click', (e) => {
@@ -242,6 +247,9 @@
         location.href = 'pantalla.html';
         return;
       }
+      // Práctica: contra la máquina con mouse / táctil / teclado (sin cámara)
+      this.forzarTactil = modo === 'practica';
+      if (modo === 'practica') modo = 'cpu';
       if (modo === 'online') {
         if (C.MODO_DEMO) {
           this.aviso('El modo en línea necesita el servidor del juego. Mira el README del proyecto.', 4000);
@@ -271,7 +279,7 @@
       this.entradaRival = null;
       this.eventosRed = [];
       this.eventosRecibidos = [];
-      this.controlActual = C.MODO_DEMO ? 'tactil' : this.ajustes.control;
+      this.controlActual = C.MODO_DEMO || this.forzarTactil ? 'tactil' : this.ajustes.control;
       this.vistaAR = this.controlActual === 'manos';
       this.puntero.reiniciar();
 

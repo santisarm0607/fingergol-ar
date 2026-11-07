@@ -57,36 +57,49 @@
           <path d="M32 19V5M44 28l13-5M39.5 42l8 11M24.5 42l-8 11M20 28L7 23" stroke="#1b2233" stroke-width="3" fill="none"/>
         </svg>
         <h1>Finger<span>Gol</span> <em>AR</em></h1>
-        <p class="lema">Futbolito 3D en tu mesa: tus dedos son las piernas</p>
+        <p class="lema">Futbolito 3D: la cancha en el PC, tus dedos en el celular</p>
       </header>
 
       <ol class="como-jugar" aria-label="Cómo se juega">
-        <li><b>🧾</b><span>Pon el marcador sobre la mesa</span></li>
-        <li><b>✌️</b><span>Índice y medio son tus piernas</span></li>
-        <li><b>⚽</b><span>Patea al arco rival</span></li>
+        <li><b>📺</b><span>Abre la cancha en el PC</span></li>
+        <li><b>📱</b><span>Escanea el QR con tu celular</span></li>
+        <li><b>✌️</b><span>Tus dedos son el jugador</span></li>
       </ol>
 
       <div class="modos">
-        <button class="modo destacado" data-modo="local">
-          <span class="ico">👥</span>
-          <span class="txt"><span class="tit">2 jugadores</span><span class="sub">Misma mesa · una mano cada uno</span></span>
-          <span class="flecha">›</span>
-        </button>
-        <button class="modo" data-modo="cpu">
-          <span class="ico">🤖</span>
-          <span class="txt"><span class="tit">Contra la máquina</span><span class="sub">Para jugar solo</span></span>
-          <span class="flecha">›</span>
-        </button>
-        <button class="modo" data-modo="pantalla">
+        <button class="modo destacado modo-principal" data-modo="pantalla">
           <span class="ico">📺</span>
-          <span class="txt"><span class="tit">Pantalla + celulares</span><span class="sub">Cancha en el PC · los celulares son los jugadores</span></span>
+          <span class="txt"><span class="tit">Jugar: Pantalla + celulares</span><span class="sub">La cancha aquí · cada celular es un jugador</span></span>
           <span class="flecha">›</span>
         </button>
-        <button class="modo" data-modo="online">
-          <span class="ico">🌐</span>
-          <span class="txt"><span class="tit">En línea</span><span class="sub" id="sub-online">Cada uno en su mesa, con código de sala</span></span>
+        <button class="modo" data-modo="practica">
+          <span class="ico">🤖</span>
+          <span class="txt"><span class="tit">Práctica contra la máquina</span><span class="sub">Mouse, táctil o teclado · sin cámara</span></span>
           <span class="flecha">›</span>
         </button>
+
+        <!-- Modo mesa con marcador Hiro (AR.js): escondido, sigue funcionando -->
+        <details class="ajustes mesa-exp">
+          <summary><span>🧾 Modo mesa con marcador</span> <span class="resumen">experimental</span></summary>
+          <div class="mesa-modos">
+            <p class="nota">Necesitas el <button class="enlace" data-ver-marcador>marcador Hiro</button> sobre la mesa y el celular quieto mirándolo.</p>
+            <button class="modo" data-modo="local">
+              <span class="ico">👥</span>
+              <span class="txt"><span class="tit">2 jugadores</span><span class="sub">Misma mesa · una mano cada uno</span></span>
+              <span class="flecha">›</span>
+            </button>
+            <button class="modo" data-modo="cpu">
+              <span class="ico">🤖</span>
+              <span class="txt"><span class="tit">Contra la máquina</span><span class="sub">Tus dedos sobre la mesa</span></span>
+              <span class="flecha">›</span>
+            </button>
+            <button class="modo" data-modo="online">
+              <span class="ico">🌐</span>
+              <span class="txt"><span class="tit">En línea</span><span class="sub" id="sub-online">Cada uno en su mesa, con código de sala</span></span>
+              <span class="flecha">›</span>
+            </button>
+          </div>
+        </details>
       </div>
 
       <details class="ajustes" id="ajustes">
@@ -120,6 +133,20 @@
       </details>
 
       <footer class="pie">Hecho por <b>SantiSarm</b> · AR.js + MediaPipe</footer>
+    </div>
+  </section>
+
+  <!-- ================= CELULAR: ¿eres jugador? ================= -->
+  <section id="p-celular" class="pantalla">
+    <div class="tarjeta centro">
+      <div class="cel-ico">📱</div>
+      <h2>¿Eres jugador?</h2>
+      <p class="sub-tarjeta">Escanea el <b>código QR</b> que aparece en la pantalla del computador
+        con la cámara de tu celular. Tus dedos serán el jugador ✌️</p>
+      <div class="botones col">
+        <a class="btn grande" href="control.html">⌨️ Tengo un código</a>
+        <button class="btn sec" id="btn-ver-menu">Ver el menú completo</button>
+      </div>
     </div>
   </section>
 

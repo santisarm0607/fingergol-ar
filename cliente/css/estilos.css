@@ -742,3 +742,15 @@ body.modo-ar.vertical.en-juego #aviso-girar { display: block; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
 }
+
+/* ================= MENÚ 2.2: Pantalla + celulares primero ================= */
+.modo-principal { padding: 18px 16px; }
+.modo-principal .tit { font-size: 23px; }
+.mesa-exp { margin-top: 4px; }
+.mesa-modos { display: flex; flex-direction: column; gap: 8px; padding: 0 10px 12px; }
+.mesa-modos .nota { margin: 10px 4px 2px; }
+.mesa-modos .modo { padding: 10px 12px; }
+.mesa-modos .modo .ico { width: 40px; height: 40px; font-size: 20px; }
+.mesa-modos .modo .tit { font-size: 18px; }
+.cel-ico { font-size: 64px; line-height: 1; margin-bottom: 4px; }
+a.btn { display: block; text-align: center; text-decoration: none; }
