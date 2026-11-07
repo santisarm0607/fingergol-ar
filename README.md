@@ -6,16 +6,16 @@ Juego web de fútbol en **realidad aumentada**: la cámara ve tu mano, tu **dedo
 - **Hand tracker** (`cliente/js/entrada/hand-tracker.js`) → convierte esos puntos en jugadores.
 - **Multijugador**: 2 jugadores en la misma cámara, contra la máquina, o **en línea** con código de sala.
 
-Autor: **SantiSarm** · Versión **1.2**
+Autor: **SantiSarm** · Versión **1.3**
 
-### Novedades 1.2: diseño de álbum de láminas
-- El menú es un **álbum abierto**: a la izquierda tus dos puestos (Jugador 1 y 2) y los modos de juego como **sobres de láminas**; a la derecha **tu colección** de 10 figuras.
-- Para escoger figura: toca un puesto y luego una lámina, y se "pega" en tu puesto.
-- Letras nuevas: *Big Shoulders Display* (títulos) y *Barlow* (textos). Colores de álbum: tapa azul, páginas verde cancha, cintas amarillas.
-- Las fichas en la cancha ahora son láminas redondas con borde blanco.
+### Novedades 1.3: mesa de air hockey neón
+- Todo el juego es una **máquina de air hockey**: mesa índigo con los huequitos del aire, líneas de neón azul celeste (equipo 1) y fucsia (equipo 2), y un **disco** amarillo limón.
+- Los jugadores son **mazos de air hockey**; con la cámara, un anillo de neón marca tu mazo en la punta del dedo índice.
+- Menú nuevo encima de la mesa encendida: letrero de neón que se prende al abrir y botones de máquina de salón.
+- Sin emojis: los íconos (pausa, sonido, pantalla completa, copa) están dibujados.
+- Letras: *Monoton* (letrero) y *Rajdhani* (textos).
 
 ### Novedades 1.1
-- **Figuras:** escoge un emoji para tu ficha. También aparece en la punta de tu dedo índice. La máquina es 🤖.
 - **Se siente mejor:** pausa cortita al pegar fuerte, temblor, estela de color en los tiros fuertes, cámara lenta en el gol y pitazo final.
 - **Aviso de poca luz** cuando la cámara no ve bien tu mano.
 - Se quitó el Modo Mesa (marcador Hiro). En GitHub Pages el modo En línea aparece desactivado (necesita el servidor).
@@ -173,7 +173,6 @@ En `cliente/js/config.js` puedes cambiar:
 - `EQUIPOS` → colores de cada equipo.
 - `GOLES_POR_DEFECTO`.
 - `SERVIDOR_URL` → si subes la página y el servidor a sitios distintos.
-- `FIGURAS` → los emojis que puedes poner en tu ficha.
 - Versión de MediaPipe.
 
 Los sonidos se generan en código (`audio/sonidos.js`). Para usar archivos `.mp3`, ponlos en `cliente/assets/` y reemplaza la función correspondiente.
