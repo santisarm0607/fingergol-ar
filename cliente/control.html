@@ -41,8 +41,25 @@
     <p class="listo-txt">Conectado como</p>
     <h2 class="listo-equipo" id="listo-equipo">AZUL</h2>
     <p class="listo-sala" id="listo-sala"></p>
-    <p class="sub-tarjeta">Mira la pantalla grande. En la siguiente parte aquí se encenderá la cámara
-      y tus dedos <b>índice</b> y <b>medio</b> serán las piernas de tu jugador.</p>
+    <p class="sub-tarjeta">Apoya el celular en la mesa (en un vaso o soporte) con la cámara mirando tu mano.
+      Tus dedos <b>índice</b> y <b>medio</b> serán las piernas de tu jugador.</p>
+    <button class="btn grande" id="btn-camara">📷 Encender cámara</button>
+  </section>
+
+  <!-- Cámara: tus dedos son el jugador -->
+  <section class="vista vista-camara" id="v-camara">
+    <div class="cam-barra">
+      <span class="cam-equipo" id="cam-equipo">AZUL</span>
+      <span class="cam-marcador" id="cam-marcador">0 – 0</span>
+      <button class="btn-icono" id="btn-girar-cam" aria-label="Cambiar cámara" title="Cambiar cámara">🔄</button>
+    </div>
+    <div class="cam-caja">
+      <canvas id="cam-lienzo"></canvas>
+      <video id="cam-video" playsinline muted autoplay></video>
+      <div class="cam-estado" id="cam-estado">Abriendo la cámara…</div>
+    </div>
+    <p class="cam-ayuda" id="cam-ayuda">Mueve el <b>índice</b> y el <b>medio</b> frente a la cámara. Todo lo que ve la cámara es <b>tu mitad</b> de la cancha.</p>
+    <button class="btn sec oculto" id="btn-reintentar-cam">🔄 Intentar de nuevo</button>
   </section>
 
   <!-- Error -->
@@ -58,6 +75,7 @@
 
   <script src="js/config.js"></script>
   <script src="js/utilidades.js"></script>
+  <script src="js/entrada/hand-tracker.js"></script>
   <script src="js/lib/peerjs.min.js"></script>
   <script src="js/fiesta/enlace.js"></script>
   <script src="js/fiesta/control.js"></script>

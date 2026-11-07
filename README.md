@@ -14,6 +14,19 @@ Autor: **SantiSarm**
 
 ---
 
+## ⭐ Modo principal: 📺 Pantalla + celulares
+
+1. En el **computador** abre el juego y pulsa **📺 Jugar: Pantalla + celulares**. Aparece la cancha y un **código QR**.
+2. Cada jugador **escanea el QR** con la cámara de su celular (o abre el link y escribe el código de 4 letras).
+3. En el celular pulsa **📷 Encender cámara** y apóyalo en la mesa mirando tu mano.
+4. Tu **índice** y tu **medio** son los pies de tu jugador. Todo lo que ve la cámara es **tu mitad** de la cancha.
+5. ¿Solo hay un celular? Pulsa **🤖 Poner bot** en el otro lado (Fácil / Normal / Difícil).
+6. Pulsa **⚽ ¡A jugar!** en el computador.
+
+Funciona desde **GitHub Pages** (no necesita `npm start`): los celulares se conectan directo a la pantalla con **PeerJS** (WebRTC); su servidor gratis solo ayuda a que se encuentren. Archivos: `cliente/pantalla.html`, `cliente/control.html` y `cliente/js/fiesta/`.
+
+---
+
 ## 1. Cómo ejecutarlo (2 minutos)
 
 Necesitas **Node.js 18 o más nuevo** ([nodejs.org](https://nodejs.org)) y **Chrome o Edge**.

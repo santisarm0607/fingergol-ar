@@ -187,3 +187,65 @@
 .demo-sim a { color: var(--amarillo); }
 .demo-botones { display: flex; gap: 10px; margin: 8px 0; }
 .demo-botones .btn { flex: 1; font-size: 16px; padding: 8px 12px; }
+
+/* ---------------- PANTALLA: bots, partido y fin ---------------- */
+.fiesta-der { position: fixed; top: 14px; right: 14px; z-index: 40; display: flex; gap: 8px; }
+body.fiesta-pantalla:not(.jugando) .solo-juego { display: none !important; }
+body.fiesta-pantalla.jugando .solo-sala { display: none !important; }
+body.fiesta-pantalla.jugando #escenario { filter: none; }
+
+.puesto { grid-template-columns: auto 1fr auto; }
+.puesto .btn-bot {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--texto);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.puesto .btn-bot:hover { background: rgba(255, 255, 255, 0.14); }
+.puesto.es-bot { border-style: solid; }
+.puesto.es-bot .estado { color: var(--amarillo); }
+
+.fila-nivel { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--sub); font-size: 15px; }
+.fila-nivel .segmentos { display: flex; gap: 4px; padding: 3px; border-radius: 12px; background: rgba(255, 255, 255, 0.06); }
+.fila-nivel .segmentos button {
+  border: 0; border-radius: 9px; padding: 5px 12px; font-size: 14px; font-weight: 700;
+  background: transparent; color: var(--sub);
+}
+.fila-nivel .segmentos button.activo { background: var(--amarillo); color: #1b1400; }
+#btn-jugar:disabled { opacity: 0.45; filter: grayscale(0.6); cursor: not-allowed; }
+
+.fiesta-marcador { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 35; }
+.fiesta-fin {
+  position: fixed; inset: 0; z-index: 45; display: flex; align-items: center; justify-content: center;
+  padding: 16px; background: rgba(5, 8, 20, 0.6); backdrop-filter: blur(4px);
+}
+.fiesta-fin .tarjeta { max-width: 380px; }
+.fiesta-fin h2 { font-size: 38px !important; }
+.fin-marcador { margin: 4px 0 6px; font-size: 54px; font-weight: 800; letter-spacing: 0.05em; }
+
+/* ---------------- CELULAR: cámara ---------------- */
+.fiesta-control.con-camara { padding: 10px; }
+.fiesta-control.con-camara .control-logo { display: none; }
+.vista-camara { max-width: 640px; margin: 0; gap: 8px; flex: 1; }
+.cam-barra { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cam-equipo { font-size: 24px; font-weight: 800; }
+.fiesta-control[data-lado="0"] .cam-equipo { color: var(--azul); }
+.fiesta-control[data-lado="1"] .cam-equipo { color: var(--rojo); }
+.cam-marcador { font-size: 26px; font-weight: 800; padding: 2px 14px; border-radius: 14px; background: rgba(8, 12, 28, 0.8); border: 1px solid var(--borde); }
+.cam-caja { position: relative; width: 100%; flex: 1; min-height: 260px; border-radius: 18px; overflow: hidden; background: #000; }
+.cam-caja video { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.cam-caja canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.cam-estado {
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%);
+  max-width: calc(100% - 20px); padding: 6px 14px; border-radius: 14px;
+  background: rgba(8, 12, 28, 0.85); font-weight: 700; font-size: 16px; text-align: center;
+}
+.cam-estado.ok { color: var(--verde); }
+.cam-estado.alerta { color: var(--amarillo); }
+.cam-ayuda { margin: 0; color: var(--sub); font-size: 14px; line-height: 1.35; }
