@@ -22,14 +22,14 @@
     ocupada: 'Otra app está usando la cámara (Zoom, Meet, otra pestaña…). Ciérrala y pulsa <b>Reintentar</b>.',
     mediapipe: 'No se pudo descargar el detector de manos (MediaPipe). Revisa tu conexión a internet.',
     modelo: 'No se pudo iniciar el detector de manos en este dispositivo.',
-    arjs: 'No se pudo cargar AR.js. Revisa tu conexión a internet.',
     desconocido: 'Algo falló al encender la cámara.'
   };
 
   const App = {
     ajustes: {
       control: U.leer('control', 'manos'),
-      vista: U.leer('vista', 'pantalla'),
+      fig0: U.leer('fig0', '😎'),
+      fig1: U.leer('fig1', '👽'),
       goles: U.leer('goles', C.GOLES_POR_DEFECTO),
       dificultad: U.leer('dificultad', 'normal')
     },
@@ -62,10 +62,19 @@
         this.ajustes.control = 'tactil';
         $('#banner-demo').classList.remove('oculto');
         document.body.classList.add('demo');
-        $('#sub-online').textContent = 'Necesita el servidor del juego (README)';
-        $('[data-modo="online"]').classList.add('deshabilitado');
         $('[data-ajuste="control"] [data-valor="manos"]').disabled = true;
       }
+      // En GitHub Pages (o en la vista previa) no corre el servidor de Node: sin modo en línea
+      this.sinServidor = C.MODO_DEMO || /github\.io$/.test(location.hostname) || location.protocol === 'file:';
+      if (this.sinServidor) {
+        $('#sub-online').textContent = 'Necesita el servidor del juego (npm start o Render)';
+        $('[data-modo="online"]').classList.add('deshabilitado');
+      }
+
+      // botones de figuras (J1 y J2)
+      $$('.segmentos.figuras').forEach((seg) => {
+        seg.innerHTML = C.FIGURAS.map((f) => `<button data-valor="${f}" aria-label="Figura ${f}">${f}</button>`).join('');
+      });
 
       this.conectarUI();
       this.refrescarAjustes();
@@ -93,13 +102,6 @@
       $$('[data-menu]').forEach((b) => b.addEventListener('click', () => this.irAlMenu()));
       $$('[data-volver]').forEach((b) => b.addEventListener('click', () => this.irAlMenu()));
 
-      $('#btn-ver-marcador').addEventListener('click', (e) => {
-        e.preventDefault();
-        $('#img-hiro').src = C.MARCADOR_HIRO;
-        $('#link-hiro').href = C.MARCADOR_HIRO;
-        this.mostrar('p-marcador');
-      });
-      $('#btn-cerrar-marcador').addEventListener('click', () => this.mostrar('p-inicio'));
 
       // carga
       $('#btn-reintentar').addEventListener('click', () => this.reintentar());
@@ -176,12 +178,8 @@
         );
       });
       const conManos = this.ajustes.control === 'manos';
-      $('#fila-vista').classList.toggle('deshabilitado', !conManos);
-      $('#nota-mesa').classList.toggle('oculto', !(conManos && this.ajustes.vista === 'mesa'));
       $('#resumen-ajustes').textContent =
-        (conManos ? '✋ Manos' : '👆 Táctil') +
-        (conManos ? (this.ajustes.vista === 'mesa' ? ' · 🧾 Mesa' : ' · 📺 Pantalla') : '') +
-        ' · ' + this.ajustes.goles + ' goles';
+        (conManos ? '✋ Manos' : '👆 Táctil') + ' · ' + this.ajustes.fig0 + ' ' + this.ajustes.fig1 + ' · ' + this.ajustes.goles + ' goles';
     },
 
     /* ====================== PANTALLAS ====================== */
@@ -220,8 +218,8 @@
       this.sonidos.activar();
       this.sonidos.boton();
       if (modo === 'online') {
-        if (C.MODO_DEMO) {
-          this.aviso('El modo en línea necesita el servidor del juego. Mira el README del proyecto.', 4000);
+        if (this.sinServidor) {
+          this.aviso('El modo en línea necesita el servidor del juego (npm start o Render). Mira el README.', 4000);
           return;
         }
         this.mostrarOnline();
@@ -248,7 +246,6 @@
       this.eventosRed = [];
       this.eventosRecibidos = [];
       this.controlActual = C.MODO_DEMO ? 'tactil' : this.ajustes.control;
-      this.vistaAR = this.controlActual === 'manos' && this.ajustes.vista === 'mesa';
       this.puntero.reiniciar();
       this.fase = 'carga';
 
@@ -266,9 +263,8 @@
 
     async prepararCamara(token) {
       this.mostrar('p-carga');
-      const pasos = { ar: $('#paso-ar'), camara: $('#paso-camara'), modelo: $('#paso-modelo') };
+      const pasos = { camara: $('#paso-camara'), modelo: $('#paso-modelo') };
       Object.values(pasos).forEach((p) => (p.dataset.estado = ''));
-      pasos.ar.classList.toggle('oculto', !this.vistaAR);
       $('#carga-error').classList.add('oculto');
       $('#carga-spinner').classList.remove('oculto');
       $('#carga-titulo').textContent = 'Preparando el juego…';
@@ -278,28 +274,11 @@
         if (estado === 'activo') paso = p;
       };
       try {
-        if (this.vistaAR) {
-          marcar(pasos.ar, 'activo');
-          if (!this.ar) this.ar = new FG.RenderAR($('#contenedor-ar'));
-          try {
-            await this.ar.cargarLibrerias();
-          } catch (e) {
-            e.codigo = 'arjs';
-            throw e;
-          }
-          marcar(pasos.ar, 'hecho');
-          marcar(pasos.camara, 'activo');
-          FG.Camara.detener();
-          document.body.classList.add('modo-ar');
-          if (!this.ar.video) await this.ar.crearEscena();
-          this.videoActivo = this.ar.video;
-        } else {
-          marcar(pasos.camara, 'activo');
-          if (!FG.Camara.stream) await FG.Camara.iniciar(this.video);
-          this.videoActivo = this.video;
-        }
+        marcar(pasos.camara, 'activo');
+        if (!FG.Camara.stream) await FG.Camara.iniciar(this.video);
+        this.videoActivo = this.video;
         if (token !== this.tokenPrep) {
-          if (!this.vistaAR) FG.Camara.detener(); // el usuario volvió al menú mientras cargaba
+          FG.Camara.detener(); // el usuario volvió al menú mientras cargaba
           return false;
         }
         marcar(pasos.camara, 'hecho');
@@ -322,7 +301,7 @@
 
     entrarEscenario() {
       this.mostrar(null);
-      const conCamaraPantalla = this.controlActual === 'manos' && !this.vistaAR;
+      const conCamaraPantalla = this.controlActual === 'manos';
       document.body.classList.add('en-juego');
       document.body.classList.toggle('con-camara', conCamaraPantalla);
       this.renderer.conCamara = conCamaraPantalla;
@@ -362,10 +341,9 @@
 
     actualizarLobby(asig, dt) {
       const manos = this.controlActual === 'manos';
-      const esperandoMarcador = this.vistaAR && this.ar && !this.ar.visto;
       for (const lado of this.humanos) {
         if (!manos) this.listo[lado] = LISTO_SEG;
-        else if (asig[lado] && !esperandoMarcador) this.listo[lado] = Math.min(LISTO_SEG, this.listo[lado] + dt);
+        else if (asig[lado]) this.listo[lado] = Math.min(LISTO_SEG, this.listo[lado] + dt);
         else this.listo[lado] = Math.max(0, this.listo[lado] - dt * 0.6);
       }
 
@@ -387,13 +365,6 @@
             this.modo === 'cpu' ? '🤖 Lista para jugar' : this.rivalListo ? 'Rival listo ✓' : 'Esperando al rival…';
         }
       });
-
-      if (esperandoMarcador) {
-        $('#lobby-titulo').textContent = '🧾 Apunta la cámara al marcador Hiro';
-        $('#lobby-sub').textContent = 'Cuando aparezca la cancha, muestra tu mano.';
-        return;
-      }
-      if (this.vistaAR) $('#lobby-titulo').textContent = '¡Muestra tu mano! ✋';
 
       const localesListos = this.humanos.every((l) => this.listo[l] >= LISTO_SEG);
       if (!localesListos) return;
@@ -497,10 +468,6 @@
         this.red.cerrar();
         this.red = null;
       }
-      if (document.body.classList.contains('modo-ar')) {
-        location.reload(); // AR.js deja su cámara abierta: recargar es lo más limpio
-        return;
-      }
       FG.Camara.detener();
       this.video.srcObject = null;
       this.partido = null;
@@ -533,6 +500,12 @@
       if (this.modo === 'cpu') return ['TÚ', 'CPU'];
       return this.rol === 'anfitrion' ? ['TÚ', '2'] : ['1', 'TÚ'];
     },
+    /** Figura de cada lado: la máquina siempre es el robot. */
+    figuras() {
+      const f = [this.ajustes.fig0, this.ajustes.fig1];
+      if (this.modo === 'cpu') f[1] = C.FIGURA_CPU;
+      return f;
+    },
     actualizarNombres() {
       const n = this.nombresCortos();
       $('#nombre0').textContent = n[0];
@@ -558,7 +531,7 @@
       const lista = [];
       this.manosDibujo = [];
       if (this.controlActual === 'manos' && this.tracker.listo) {
-        const mapa = this.vistaAR ? this.ar : this.renderer;
+        const mapa = this.renderer;
         const manos = this.tracker.detectar(this.videoActivo, ahora);
         for (const m of manos) {
           const puntos = m.puntos.map((p) => mapa.videoAPantalla(p.x, p.y));
@@ -619,7 +592,10 @@
       for (const lado of [0, 1]) {
         const e = res[lado];
         if (e) {
-          if (e.dib) e.dib.color = C.EQUIPOS[lado].color;
+          if (e.dib) {
+            e.dib.color = C.EQUIPOS[lado].color;
+            e.dib.figura = this.figuras()[lado];
+          }
           if (this.tSinEntrada[lado] > 0.4) this.filtros[lado].reiniciar();
           this.tSinEntrada[lado] = 0;
           const p = e.mano ? this.filtros[lado].filtrar(e.x, e.y, t) : { x: e.x, y: e.y };
@@ -656,9 +632,18 @@
 
       const corre = this.fase === 'juego' || this.fase === 'lobby' || this.fase === 'fin';
       const simulaAqui = this.modo !== 'online' || this.rol === 'anfitrion';
+      // "game feel": el juego se congela un instante al pegar fuerte y va en cámara lenta en el gol
+      let dtFisica = dt;
+      if (this.pausaGolpe > 0) {
+        this.pausaGolpe -= dt;
+        dtFisica = 0;
+      } else if (this.camaraLenta > 0) {
+        this.camaraLenta -= dt;
+        dtFisica = dt * 0.3;
+      }
       if (simulaAqui) {
         if (this.cpu) {
-          const o = this.cpu.actualizar(corre ? dt : 0);
+          const o = this.cpu.actualizar(corre ? dtFisica : 0);
           this.partido.fijarObjetivo(1, o.x, o.y);
         }
         if (this.modo === 'online') {
@@ -666,7 +651,7 @@
           const r = viejo ? null : this.entradaRival;
           this.partido.fijarObjetivo(1, r ? r.x : null, r ? r.y : null);
         }
-        if (corre) this.partido.actualizar(dt);
+        if (corre) this.partido.actualizar(dtFisica);
       } else if (corre) {
         this.partido.interpolarRed(dt, 1);
       }
@@ -679,16 +664,15 @@
         this.enviarEntrada(ahora, asig[1]);
       }
       this.procesarEventos(eventos.concat(this.eventosRecibidos.splice(0)));
+      this.revisarLuz(ahora);
 
       this.renderer.actualizarEfectos(dt);
-      if (this.vistaAR && this.ar) this.ar.actualizar(this.partido, dt);
       this.renderer.dibujar(this.partido, {
         manos: this.manosDibujo,
         etiquetas: this._etiquetas,
         locales: this.humanos,
-        avisos: this.controlActual === 'manos' && (this.fase === 'juego' || this.fase === 'lobby'),
-        soloCapas: this.vistaAR,
-        proyectar: this.vistaAR ? (x, y) => this.ar.canchaAPantalla(x, y) : null
+        figuras: this.figuras(),
+        avisos: this.controlActual === 'manos' && (this.fase === 'juego' || this.fase === 'lobby')
       });
     },
 
@@ -706,13 +690,8 @@
       });
       p.actualizar(dt);
       p.sacarEventos();
-      if (document.body.classList.contains('modo-ar')) {
-        this.renderer.transformPantalla();
-        this.renderer.ctx.clearRect(0, 0, this.renderer.w, this.renderer.h);
-        return;
-      }
       this.renderer.actualizarEfectos(dt);
-      this.renderer.dibujar(p, { etiquetas: ['1', '2'], avisos: false });
+      this.renderer.dibujar(p, { etiquetas: ['', ''], figuras: [this.ajustes.fig0, this.ajustes.fig1], avisos: false });
     },
 
     procesarEventos(eventos) {
@@ -721,6 +700,13 @@
         switch (e.tipo) {
           case 'patada':
             this.sonidos.patada(e.fuerza);
+            this.renderer.golpear(e.lado, e.fuerza);
+            if (e.fuerza > 160 && ahora - (this.tGolpe || 0) > 250) {
+              // golpe fuerte: pausa cortita + temblor (se siente el impacto)
+              this.pausaGolpe = Math.min(0.09, 0.03 + e.fuerza / 5000);
+              this.renderer.temblor = Math.max(this.renderer.temblor, 2 + e.fuerza / 70);
+              this.tGolpe = ahora;
+            }
             if (e.fuerza > 30 && ahora - (this.tChispa || 0) > 70) {
               this.renderer.efectoPatada(e.x, e.y, e.fuerza, C.EQUIPOS[e.lado].color);
               this.tChispa = ahora;
@@ -749,6 +735,7 @@
           case 'gol':
             this.sonidos.gol();
             this.renderer.efectoGol(e.equipo);
+            this.camaraLenta = 0.9;
             this.mensaje(this.textoGol(e.equipo), 'gol', 2100);
             this.actualizarMarcador(e.equipo);
             try { if (navigator.vibrate) navigator.vibrate([60, 40, 120]); } catch (err) { /* nada */ }
@@ -759,6 +746,36 @@
             setTimeout(() => this.mostrarFin(e.ganador), 500);
             break;
         }
+      }
+    },
+
+    /** Cada 1.5 s mira qué tan oscura está la cámara; si no ve manos y hay poca luz, avisa. */
+    revisarLuz(ahora) {
+      if (this.controlActual !== 'manos' || !(this.fase === 'lobby' || this.fase === 'juego')) return;
+      if (ahora - (this.tLuz || 0) < 1500) return;
+      this.tLuz = ahora;
+      const v = this.videoActivo;
+      if (!v || v.readyState < 2) return;
+      if (!this._luz) {
+        this._luz = document.createElement('canvas');
+        this._luz.width = 32;
+        this._luz.height = 18;
+      }
+      const ctx = this._luz.getContext('2d', { willReadFrequently: true });
+      let datos;
+      try {
+        ctx.drawImage(v, 0, 0, 32, 18);
+        datos = ctx.getImageData(0, 0, 32, 18).data;
+      } catch (e) {
+        return;
+      }
+      let suma = 0;
+      for (let i = 0; i < datos.length; i += 4) suma += 0.299 * datos[i] + 0.587 * datos[i + 1] + 0.114 * datos[i + 2];
+      const brillo = suma / (datos.length / 4);
+      const sinManos = !this.manosDibujo.length;
+      if (brillo < 60 && sinManos && ahora - (this.tAvisoLuz || 0) > 10000) {
+        this.tAvisoLuz = ahora;
+        this.aviso('💡 Hay poca luz: acércate a una lámpara o ventana para que la cámara vea tu mano.', 4000);
       }
     },
 

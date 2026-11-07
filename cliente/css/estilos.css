@@ -83,11 +83,6 @@ body.con-camara #video { display: block; }
   inset: 0;
   touch-action: none;
 }
-#contenedor-ar { position: absolute; inset: 0; display: none; }
-body.modo-ar #contenedor-ar { display: block; }
-body.modo-ar #escenario { background: transparent; }
-body.modo-ar #lienzo { pointer-events: none; }
-body.modo-ar { background: #000; }
 
 /* ================= HUD ================= */
 #hud {
@@ -623,7 +618,6 @@ body.vertical .lobby-centro { top: 50%; transform: translate(-50%, -50%); }
 .fin-marcador { font-size: 58px; font-weight: 800; display: flex; justify-content: center; gap: 16px; line-height: 1.1; }
 .fin-marcador .c0 { color: var(--azul); }
 .fin-marcador .c1 { color: var(--rojo); }
-#img-hiro { display: block; margin: 8px auto 12px; background: #fff; border-radius: 12px; padding: 10px; width: 220px; height: 220px; object-fit: contain; }
 #p-marcador a { color: var(--azul); }
 
 /* ================= AVISOS ================= */
@@ -696,3 +690,8 @@ body.demo #p-inicio { padding-bottom: 60px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
 }
+
+/* ================= 1.1: figuras ================= */
+.segmentos.figuras { flex-wrap: wrap; justify-content: flex-end; max-width: 260px; }
+.segmentos.figuras button { font-size: 20px; padding: 4px 6px; line-height: 1.1; }
+.segmentos.figuras button.activo { background: var(--amarillo); }

@@ -110,8 +110,12 @@
     }
     pitazo() {
       if (!this.puede('pitazo', 300)) return;
+      this.silbato(0, 0.5);
+    }
+    /** Silbato del árbitro (retraso y duración en segundos). */
+    silbato(retraso, dur) {
       const c = this.ctx;
-      const t = c.currentTime;
+      const t = c.currentTime + retraso;
       const o = c.createOscillator();
       const lfo = c.createOscillator();
       const lfoG = c.createGain();
@@ -123,13 +127,13 @@
       lfo.connect(lfoG).connect(o.frequency);
       g.gain.setValueAtTime(0.0001, t);
       g.gain.exponentialRampToValueAtTime(0.16, t + 0.02);
-      g.gain.setValueAtTime(0.16, t + 0.4);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+      g.gain.setValueAtTime(0.16, t + dur - 0.1);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
       o.connect(g).connect(this.salida);
       o.start(t);
       lfo.start(t);
-      o.stop(t + 0.55);
-      lfo.stop(t + 0.55);
+      o.stop(t + dur + 0.05);
+      lfo.stop(t + dur + 0.05);
     }
     gol() {
       if (!this.puede('gol', 500)) return;
@@ -140,8 +144,12 @@
     }
     fin() {
       if (!this.puede('fin', 800)) return;
+      // pitazo final: corto, corto, largo… y luego la fanfarria
+      this.silbato(0, 0.22);
+      this.silbato(0.32, 0.22);
+      this.silbato(0.64, 0.75);
       [392, 523, 659, 784, 659, 784, 1046].forEach((f, i) =>
-        this.tono(f, i === 6 ? 0.8 : 0.18, 'square', 0.07, i * 0.14)
+        this.tono(f, i === 6 ? 0.8 : 0.18, 'square', 0.07, 1.5 + i * 0.14)
       );
     }
   }

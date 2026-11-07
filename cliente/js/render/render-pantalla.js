@@ -8,6 +8,8 @@
   const FG = (window.FG = window.FG || {});
   const C = FG.config;
   const F = C.CANCHA;
+  const U = FG.util;
+  const FUENTE_EMOJI = '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
 
   function rgba(hex, a) {
     const n = parseInt(hex.slice(1), 16);
@@ -15,7 +17,7 @@
   }
   FG.util.rgba = rgba;
 
-  /** Dibuja la cancha en coordenadas de cancha. Se usa en pantalla y como textura en AR. */
+  /** Dibuja la cancha en coordenadas de cancha. */
   FG.dibujarCampo = function (ctx, op = {}) {
     const W = F.ancho;
     const H = F.alto;
@@ -113,6 +115,8 @@
       this.estela = [];
       this.temblor = 0;
       this.destello = null;
+      this.golpes = [0, 0];   // "rebote" de cada figura al pegarle al balón (1 → 0)
+      this.fuego = null;      // estela de color después de un tiro fuerte
       this.ajustar();
       window.addEventListener('resize', () => this.ajustar());
       window.addEventListener('orientationchange', () => setTimeout(() => this.ajustar(), 250));
@@ -215,6 +219,11 @@
       this.temblor = 14;
       this.destello = { color: C.EQUIPOS[equipo].color, vida: 0.5 };
     }
+    /** La figura del jugador "salta" al pegarle al balón. */
+    golpear(lado, fuerza) {
+      this.golpes[lado] = 1;
+      if (fuerza > 190) this.fuego = { color: C.EQUIPOS[lado].color, vida: 0.8 };
+    }
     textoFlotante(texto, fx, fy, color) {
       this.textos.push({ texto, fx, fy, color, vida: 1.1, max: 1.1 });
     }
@@ -233,6 +242,11 @@
       for (const t of this.textos) t.vida -= dt;
       this.textos = this.textos.filter((t) => t.vida > 0);
       this.temblor *= Math.exp(-6 * dt);
+      this.golpes = this.golpes.map((g) => Math.max(0, g - dt * 4));
+      if (this.fuego) {
+        this.fuego.vida -= dt;
+        if (this.fuego.vida <= 0) this.fuego = null;
+      }
       if (this.destello) {
         this.destello.vida -= dt;
         if (this.destello.vida <= 0) this.destello = null;
@@ -279,11 +293,14 @@
       else this.estela.shift();
       if (this.estela.length > 10) this.estela.shift();
       const ctx = this.ctx;
+      // después de un tiro fuerte la estela toma el color del equipo
+      const color = this.fuego ? this.fuego.color : '#ffffff';
+      const fuerte = this.fuego ? Math.min(1, this.fuego.vida * 2) : 0;
       this.estela.forEach((p, i) => {
         const a = (i + 1) / this.estela.length;
-        ctx.fillStyle = `rgba(255,255,255,${a * 0.22})`;
+        ctx.fillStyle = rgba(color, a * (0.22 + fuerte * 0.4));
         ctx.beginPath();
-        ctx.arc(p.x, p.y, b.r * (0.4 + a * 0.6), 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, b.r * (0.4 + a * (0.6 + fuerte * 0.5)), 0, Math.PI * 2);
         ctx.fill();
       });
     }
@@ -365,12 +382,40 @@
       const ctx = this.ctx;
       const [sx, sy] = this.canchaAPantalla(j.x, j.y);
       const rPx = j.r * this.campo.s;
-      const texto = (op.etiquetas && op.etiquetas[j.lado]) || String(j.lado + 1);
-      ctx.font = `800 ${Math.max(10, rPx * (texto.length > 2 ? 0.55 : 0.8))}px "Baloo 2", system-ui, sans-serif`;
+      const texto = op.etiquetas ? op.etiquetas[j.lado] : String(j.lado + 1);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(texto, sx, sy + rPx * 0.06);
+      const figura = op.figuras && op.figuras[j.lado];
+      if (figura) {
+        // figura (emoji) encima de la ficha: se inclina al moverse y salta al patear
+        const g = this.golpes[j.lado];
+        const salto = 1 + 0.38 * Math.sin(g * Math.PI);
+        const inclina = U.clamp((this.rotado ? -j.vy : j.vx) / 500, -0.35, 0.35);
+        ctx.save();
+        ctx.translate(sx, sy);
+        ctx.rotate(inclina);
+        ctx.scale(salto, salto);
+        ctx.font = `${Math.max(16, rPx * 1.3)}px ${FUENTE_EMOJI}`;
+        ctx.fillText(figura, 0, rPx * 0.08);
+        ctx.restore();
+        if (texto) {
+          // nombre pequeño debajo de la ficha
+          ctx.font = `800 ${Math.max(10, rPx * 0.42)}px "Baloo 2", system-ui, sans-serif`;
+          const ancho = ctx.measureText(texto).width + 12;
+          const y = sy + rPx + Math.max(9, rPx * 0.35);
+          ctx.fillStyle = rgba(C.EQUIPOS[j.lado].oscuro, 0.9);
+          ctx.beginPath();
+          if (ctx.roundRect) ctx.roundRect(sx - ancho / 2, y - 9, ancho, 18, 9);
+          else ctx.rect(sx - ancho / 2, y - 9, ancho, 18);
+          ctx.fill();
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(texto, sx, y + 1);
+        }
+      } else {
+        ctx.font = `800 ${Math.max(10, rPx * ((texto || '').length > 2 ? 0.55 : 0.8))}px "Baloo 2", system-ui, sans-serif`;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(texto || String(j.lado + 1), sx, sy + rPx * 0.06);
+      }
 
       const esLocal = !op.locales || op.locales.includes(j.lado);
       if (!j.activo && esLocal && op.avisos) {
@@ -479,8 +524,17 @@
         ctx.strokeStyle = m.color;
         ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.arc(punta[0], punta[1], 9, 0, Math.PI * 2);
+        ctx.arc(punta[0], punta[1], m.figura ? 20 : 9, 0, Math.PI * 2);
         ctx.stroke();
+        if (m.figura) {
+          // tu figura en la punta del dedo índice
+          ctx.fillStyle = rgba(m.color, 0.35);
+          ctx.fill();
+          ctx.font = `26px ${FUENTE_EMOJI}`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(m.figura, punta[0], punta[1] + 2);
+        }
       }
     }
 

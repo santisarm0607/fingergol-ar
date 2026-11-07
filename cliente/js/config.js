@@ -21,16 +21,9 @@ FG.config = {
   MODELO_MANO:
     'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
 
-  // --- AR.js + A-Frame (solo para el "Modo Mesa" con marcador) ---
-  AFRAME_URLS: [
-    'https://aframe.io/releases/1.6.0/aframe.min.js',
-    'https://cdn.jsdelivr.net/gh/aframevr/aframe@1.6.0/dist/aframe-master.min.js'
-  ],
-  ARJS_URLS: [
-    'https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js',
-    'https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@master/aframe/build/aframe-ar.js'
-  ],
-  MARCADOR_HIRO: 'https://upload.wikimedia.org/wikipedia/commons/4/48/Hiro_marker_ARjs.png',
+  // --- Figuras: la que eliges aparece en tu ficha y en la punta de tu dedo índice ---
+  FIGURAS: ['😎', '👽', '🐯', '🦖', '🐸', '🦊', '🐼', '🦁', '🐙', '⚡'],
+  FIGURA_CPU: '🤖',
 
   // --- Servidor en línea ------------------------------------
   // null = usa el mismo servidor que entrega la página (lo normal).

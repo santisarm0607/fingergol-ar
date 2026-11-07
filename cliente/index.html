@@ -10,14 +10,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/estilos.css">
+  <link rel="stylesheet" href="css/estilos.css?v=1.1">
 </head>
 <body>
 
   <!-- ================= ESCENARIO (cámara + cancha) ================= -->
   <div id="escenario">
     <video id="video" playsinline muted autoplay></video>
-    <div id="contenedor-ar"></div>
     <canvas id="lienzo"></canvas>
   </div>
 
@@ -93,14 +92,14 @@
             <button data-valor="tactil">👆 Táctil / mouse</button>
           </div>
         </div>
-        <div class="fila" id="fila-vista">
-          <span class="etq">Vista AR</span>
-          <div class="segmentos" data-ajuste="vista">
-            <button data-valor="pantalla">📺 Pantalla</button>
-            <button data-valor="mesa">🧾 Mesa (marcador)</button>
-          </div>
+        <div class="fila">
+          <span class="etq">Figura J1</span>
+          <div class="segmentos figuras" data-ajuste="fig0"></div>
         </div>
-        <p class="nota" id="nota-mesa">Modo Mesa: imprime el <button class="enlace" id="btn-ver-marcador">marcador Hiro</button>, ponlo sobre la mesa y deja el celular quieto apuntándolo.</p>
+        <div class="fila">
+          <span class="etq">Figura J2</span>
+          <div class="segmentos figuras" data-ajuste="fig1"></div>
+        </div>
         <div class="fila">
           <span class="etq">Goles para ganar</span>
           <div class="segmentos" data-ajuste="goles">
@@ -120,7 +119,7 @@
         <p class="nota">Sin cámara: Jugador 1 usa <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> y Jugador 2 las <kbd>flechas</kbd>, o toquen la pantalla con un dedo cada uno.</p>
       </details>
 
-      <footer class="pie">Hecho por <b>SantiSarm</b> · MediaPipe + AR.js</footer>
+      <footer class="pie">Hecho por <b>SantiSarm</b> · MediaPipe · v1.1</footer>
     </div>
   </section>
 
@@ -154,7 +153,6 @@
       <div class="spinner" id="carga-spinner"></div>
       <h2 id="carga-titulo">Preparando el juego…</h2>
       <ul class="pasos">
-        <li id="paso-ar" class="oculto"><span class="ic"></span><span><b>Cargar AR.js</b><small>Realidad aumentada para la mesa</small></span></li>
         <li id="paso-camara"><span class="ic"></span><span><b>Encender la cámara</b><small>Pulsa “Permitir” si el navegador lo pregunta</small></span></li>
         <li id="paso-modelo"><span class="ic"></span><span><b>Cargar el detector de manos</b><small>La primera vez tarda unos segundos</small></span></li>
       </ul>
@@ -242,29 +240,17 @@
     </div>
   </section>
 
-  <!-- ================= MARCADOR HIRO ================= -->
-  <section id="p-marcador" class="pantalla modal">
-    <div class="tarjeta centro">
-      <h2>🧾 Marcador Hiro</h2>
-      <img id="img-hiro" alt="Marcador Hiro de AR.js" width="220" height="220">
-      <p class="sub-tarjeta">Imprímelo (unos 8–10 cm, con borde blanco) o ábrelo en otra pantalla.
-        <a id="link-hiro" target="_blank" rel="noopener">Abrir imagen</a></p>
-      <button class="btn" id="btn-cerrar-marcador">Listo</button>
-    </div>
-  </section>
-
   <!-- Scripts en orden: configuración → utilidades → módulos → app -->
-  <script src="js/config.js"></script>
-  <script src="js/utilidades.js"></script>
-  <script src="js/audio/sonidos.js"></script>
-  <script src="js/juego/fisica.js"></script>
-  <script src="js/juego/cpu.js"></script>
-  <script src="js/entrada/camara.js"></script>
-  <script src="js/entrada/hand-tracker.js"></script>
-  <script src="js/entrada/puntero.js"></script>
-  <script src="js/render/render-pantalla.js"></script>
-  <script src="js/render/render-ar.js"></script>
-  <script src="js/red/red.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/config.js?v=1.1"></script>
+  <script src="js/utilidades.js?v=1.1"></script>
+  <script src="js/audio/sonidos.js?v=1.1"></script>
+  <script src="js/juego/fisica.js?v=1.1"></script>
+  <script src="js/juego/cpu.js?v=1.1"></script>
+  <script src="js/entrada/camara.js?v=1.1"></script>
+  <script src="js/entrada/hand-tracker.js?v=1.1"></script>
+  <script src="js/entrada/puntero.js?v=1.1"></script>
+  <script src="js/render/render-pantalla.js?v=1.1"></script>
+  <script src="js/red/red.js?v=1.1"></script>
+  <script src="js/app.js?v=1.1"></script>
 </body>
 </html>

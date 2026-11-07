@@ -4,10 +4,15 @@ Juego web de fútbol en **realidad aumentada**: la cámara ve tu mano, tu **dedo
 
 - **MediaPipe Hand Landmarker** → detecta los 21 puntos de cada mano.
 - **Hand tracker** (`cliente/js/entrada/hand-tracker.js`) → convierte esos puntos en jugadores.
-- **AR.js + A-Frame** → "Modo Mesa": la cancha 3D aparece sobre un marcador impreso.
 - **Multijugador**: 2 jugadores en la misma cámara, contra la máquina, o **en línea** con código de sala.
 
-Autor: **SantiSarm**
+Autor: **SantiSarm** · Versión **1.1**
+
+### Novedades 1.1
+- **Figuras:** escoge un emoji para tu ficha en *Ajustes → Figura J1 / J2*. También aparece en la punta de tu dedo índice. La máquina es 🤖.
+- **Se siente mejor:** pausa cortita al pegar fuerte, temblor, estela de color en los tiros fuertes, cámara lenta en el gol y pitazo final.
+- **Aviso de poca luz** cuando la cámara no ve bien tu mano.
+- Se quitó el Modo Mesa (marcador Hiro). En GitHub Pages el modo En línea aparece desactivado (necesita el servidor).
 
 ---
 
@@ -26,7 +31,7 @@ Necesitas **Node.js 18 o más nuevo** ([nodejs.org](https://nodejs.org)) y **Chr
 4. Elige un modo y pulsa **Permitir** cuando el navegador pida la cámara.
 
 > No hace falta `npm install`: el servidor usa solo módulos que ya trae Node.
-> Las librerías (MediaPipe, AR.js) se descargan solas desde internet la primera vez, así que necesitas conexión.
+> MediaPipe se descarga solas desde internet la primera vez, así que necesitas conexión.
 
 **Sin Node (solo modos locales):** instala la extensión **Live Server** en VS Code, clic derecho en `cliente/index.html` → *Open with Live Server*. Funcionan "2 jugadores" y "Contra la máquina"; el modo **En línea** necesita `npm start`.
 
@@ -73,7 +78,7 @@ En *Ajustes → Control → Táctil / mouse*:
 2. *Settings → Pages → Source: Deploy from a branch → main → / (root)* → Save.
 3. En 1–2 minutos abre `https://TU-USUARIO.github.io/NOMBRE-DEL-REPO/` (el `index.html` de la raíz te lleva solo al juego).
 
-Ahí funcionan la cámara, las manos, "2 jugadores", "Contra la máquina" y el Modo Mesa. El modo **En línea** no, porque GitHub Pages no corre el servidor de Node.
+Ahí funcionan la cámara, las manos, "2 jugadores" y "Contra la máquina". El modo **En línea** no, porque GitHub Pages no corre el servidor de Node.
 
 **Entre dos dispositivos en línea** hay un detalle: los navegadores **solo dan la cámara en `https://`** (o en `localhost`). Por eso `http://192.168.x.x:3000` sirve para jugar con táctil/mouse, pero no con las manos. Dos soluciones:
 
@@ -107,19 +112,6 @@ Te da un link `https://algo.trycloudflare.com` que funciona mientras la terminal
 
 ---
 
-## 4. Modo Mesa (AR.js con marcador)
-
-La cancha aparece en 3D **encima de la mesa**, anclada a un marcador impreso.
-
-1. *Ajustes → Control: Manos · Vista AR: Mesa (marcador)*.
-2. Imprime el **marcador Hiro** (botón "marcador Hiro" en Ajustes) a unos 8–10 cm, con borde blanco.
-3. Pon el marcador en la mesa y deja el **celular quieto** (en un soporte o apoyado) apuntándolo.
-4. Cuando aparezca la cancha, juega con el dedo **sobre la mesa**.
-
-Si tapas el marcador con la mano, la cancha se queda donde estaba (por eso el celular debe estar quieto). Este modo es más pesado: funciona mejor en celulares recientes.
-
----
-
 ## 5. Estructura de carpetas
 
 ```
@@ -146,8 +138,7 @@ fingergol-ar/
         │   ├── hand-tracker.js ← MediaPipe: puntos de la mano
         │   └── puntero.js    ← táctil, mouse y teclado
         ├── render/
-        │   ├── render-pantalla.js ← cancha 2D sobre la cámara (Canvas)
-        │   └── render-ar.js       ← cancha 3D sobre el marcador (AR.js + A-Frame)
+        │   └── render-pantalla.js ← cancha 2D sobre la cámara (Canvas)
         ├── red/
         │   └── red.js        ← cliente WebSocket del modo en línea
         └── audio/
@@ -164,7 +155,7 @@ Los scripts se cargan en orden desde `index.html` y comparten un objeto global `
 2. **Punto → pantalla → cancha:** la punta del índice (punto 8) se pasa a píxeles (el video está en espejo) y luego a "unidades de cancha" (160 × 100).
 3. **Suavizado:** un filtro *One Euro* quita el temblor de la mano sin agregar retraso.
 4. **Física a 120 Hz:** la ficha sigue al dedo; el balón rebota con la velocidad de tu dedo, en las bandas y en los postes.
-5. **Dibujo:** Canvas 2D en modo pantalla, o A-Frame/three.js en modo mesa.
+5. **Dibujo:** Canvas 2D encima del video de la cámara.
 
 ---
 
@@ -176,7 +167,8 @@ En `cliente/js/config.js` puedes cambiar:
 - `EQUIPOS` → colores de cada equipo.
 - `GOLES_POR_DEFECTO`.
 - `SERVIDOR_URL` → si subes la página y el servidor a sitios distintos.
-- Versiones de MediaPipe, A-Frame y AR.js.
+- `FIGURAS` → los emojis que puedes poner en tu ficha.
+- Versión de MediaPipe.
 
 Los sonidos se generan en código (`audio/sonidos.js`). Para usar archivos `.mp3`, ponlos en `cliente/assets/` y reemplaza la función correspondiente.
 
@@ -190,10 +182,9 @@ Los sonidos se generan en código (`audio/sonidos.js`). Para usar archivos `.mp3
 | "La cámara solo funciona desde https o localhost" | Abre `http://localhost:3000` (con `npm start`), no el archivo con doble clic. |
 | "Otra app está usando la cámara" | Cierra Zoom/Meet/otras pestañas con cámara. |
 | No detecta la mano | Más luz, mano a 40–70 cm, palma hacia la cámara, fondo sin mucho desorden. |
-| Va lento | Cierra otras pestañas; usa Chrome o Edge; en celular, prefiere el modo Pantalla. |
+| Va lento | Cierra otras pestañas; usa Chrome o Edge. |
 | "No se pudo conectar al servidor del juego" | El modo en línea necesita `npm start` (no Live Server). |
 | "El puerto 3000 ya está en uso" | `PORT=3001 npm start` (en PowerShell: `$env:PORT=3001; npm start`). |
-| El modo Mesa no muestra la cancha | Marcador bien iluminado, completo en la imagen y sin reflejos; celular quieto. |
 
 ---
 
@@ -202,7 +193,5 @@ Los sonidos se generan en código (`audio/sonidos.js`). Para usar archivos `.mp3
 | Librería | Uso | Versión |
 |---|---|---|
 | [MediaPipe Tasks Vision](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker/web_js) | Detección de manos (Hand Landmarker) | 0.10.14 |
-| [A-Frame](https://aframe.io) | Escena 3D del Modo Mesa | 1.6.0 |
-| [AR.js](https://github.com/AR-js-org/AR.js) | Seguimiento del marcador Hiro | rama master |
 
 Si quieres usar archivos locales en vez de CDN (para jugar sin internet), descárgalos y cambia las rutas en `config.js`.
