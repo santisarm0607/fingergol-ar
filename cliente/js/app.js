@@ -271,7 +271,7 @@
       Object.values(pasos).forEach((p) => (p.dataset.estado = ''));
       $('#carga-error').classList.add('oculto');
       $('#carga-spinner').classList.remove('oculto');
-      $('#carga-titulo').textContent = 'Preparando el juego…';
+      $('#carga-titulo').textContent = 'Preparando…';
       let paso = null;
       const marcar = (p, estado) => {
         p.dataset.estado = estado;
