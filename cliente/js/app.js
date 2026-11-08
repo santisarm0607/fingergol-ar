@@ -3,9 +3,6 @@
    menú → (cámara + detector) → "muestra tu mano" → partido → fin
    Cada cuadro: leer manos/toques → gestos → asignar a jugadores →
    física (o red) → sonidos/efectos → dibujar.
-   Dos formas de ver el juego:
-   - Pantalla: la mesa 2D encima de tu cámara (render-pantalla.js)
-   - Mesa 3D:  la mesa sobre un marcador en tu mesa real (ar.js + render-3d.js)
    ============================================================ */
 (function () {
   const FG = window.FG;
@@ -24,7 +21,6 @@
     'sin-camara': 'No encontramos ninguna cámara conectada a este dispositivo.',
     ocupada: 'Otra app está usando la cámara (Zoom, Meet, otra pestaña…). Ciérrala y pulsa <b>Reintentar</b>.',
     mediapipe: 'No se pudo descargar el detector de manos (MediaPipe). Revisa tu conexión a internet.',
-    arjs: 'No se pudo descargar la realidad aumentada (AR.js). Revisa tu conexión a internet y pulsa <b>Reintentar</b>.',
     modelo: 'No se pudo iniciar el detector de manos en este dispositivo.',
     desconocido: 'Algo falló al encender la cámara.'
   };
@@ -42,13 +38,18 @@
     copa: svg('<path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8"/>', ' class="copa"')
   };
 
+  /** Apodo seguro: sin < >, sin espacios de sobra, máximo 10 letras. */
+  const limpiarApodo = (t) => String(t == null ? '' : t).replace(/[<>&"]/g, '').replace(/\s+/g, ' ').trim().slice(0, 10);
+  const limpiarApodos = (l) => (Array.isArray(l) ? [limpiarApodo(l[0]), limpiarApodo(l[1])] : ['', '']);
+
   const App = {
     ajustes: {
       control: U.leer('control', 'manos'),
       goles: U.leer('goles', C.GOLES_POR_DEFECTO),
       dificultad: U.leer('dificultad', 'normal'),
       // por defecto, lo que pida el sistema (accesibilidad: "reducir movimiento")
-      movimiento: U.leer('movimiento', U.sistemaPideMenosMovimiento() ? 'reducido' : 'normal')
+      movimiento: U.leer('movimiento', U.sistemaPideMenosMovimiento() ? 'reducido' : 'normal'),
+      apodos: limpiarApodos(U.leer('apodos', ['', '']))
     },
     fase: 'menu', // menu | tutorial | carga | lobby | juego | pausa | fin | alerta
     modo: null,   // local | cpu | online
@@ -64,7 +65,6 @@
     eventosRecibidos: [],
     manosDibujo: [],
     manosCrudas: [],
-    vistaAR: false,   // true = mesa 3D sobre el marcador
     ahorro: false,    // modo ahorro (se activa solo si el juego va lento)
     pausaRed: null,   // en línea: { quien, hasta } mientras alguien reconecta
 
@@ -73,7 +73,6 @@
       this.video = $('#video');
       this.lienzo = $('#lienzo');
       this.render2D = new FG.RenderPantalla(this.lienzo, this.video);
-      this.render3D = null; // se crea al entrar a la mesa 3D
       this.renderer = this.render2D;
       this.puntero = new FG.Puntero(this.lienzo);
       this.puntero.rotado = () => this.renderer.rotado;
@@ -88,16 +87,9 @@
         $('#banner-demo').classList.remove('oculto');
         document.body.classList.add('demo');
         $('[data-ajuste="control"] [data-valor="manos"]').disabled = true;
-        $('#btn-ar').classList.add('deshabilitado');
-        $('#sub-ar').textContent = 'Necesita cámara: ejecuta el proyecto (mira el README)';
       }
       this.registrarServiceWorker();
-      // En GitHub Pages (o en la vista previa) no corre el servidor de Node: sin modo en línea
-      this.sinServidor = C.MODO_DEMO || /github\.io$/.test(location.hostname) || location.protocol === 'file:';
-      if (this.sinServidor) {
-        $('#sub-online').textContent = 'Necesita el servidor del juego (npm start o Render)';
-        $('[data-modo="online"]').classList.add('deshabilitado');
-      }
+      this.revisarServidor();
 
 
       this.conectarUI();
@@ -109,14 +101,16 @@
 
     conectarUI() {
       $$('.modo').forEach((b) => b.addEventListener('click', () => this.elegirModo(b.dataset.modo)));
-      $('#btn-ar').addEventListener('click', () => this.abrirAR());
-      $$('[data-ar-modo]').forEach((b) =>
-        b.addEventListener('click', () => {
-          this.sonidos.activar();
-          this.sonidos.boton();
-          this.prepararPartida(b.dataset.arModo, null, { ar: true });
-        })
-      );
+
+      [0, 1].forEach((i) => {
+        $('#apodo' + i).addEventListener('input', (e) => {
+          this.ajustes.apodos[i] = limpiarApodo(e.target.value);
+          U.guardar('apodos', this.ajustes.apodos);
+        });
+        $('#apodo' + i).addEventListener('change', (e) => {
+          e.target.value = this.ajustes.apodos[i];
+        });
+      });
 
       $$('.segmentos').forEach((seg) => {
         seg.addEventListener('click', (ev) => {
@@ -142,8 +136,6 @@
         this.ajustes.control = 'tactil';
         U.guardar('control', 'tactil');
         this.refrescarAjustes();
-        if (this.ultimaPrep) this.ultimaPrep.opciones = {}; // sin cámara no hay mesa 3D
-        document.body.classList.remove('modo-ar');
         this.reintentar();
       });
 
@@ -229,6 +221,10 @@
           b.classList.toggle('activo', String(this.ajustes[clave]) === b.dataset.valor)
         );
       });
+      [0, 1].forEach((i) => {
+        const inp = $('#apodo' + i);
+        if (document.activeElement !== inp) inp.value = this.ajustes.apodos[i];
+      });
       const conManos = this.ajustes.control === 'manos';
       $('#resumen-ajustes').textContent = (conManos ? 'Con la mano' : 'Con mouse') + ', a ' + this.ajustes.goles + ' goles';
       this.aplicarMovimiento();
@@ -240,7 +236,33 @@
       const menos = this.ajustes.movimiento === 'reducido';
       document.body.classList.toggle('menos-movimiento', menos);
       this.render2D.menosMovimiento = menos;
-      if (this.render3D) this.render3D.menosMovimiento = menos;
+    },
+
+    /**
+     * El botón "En línea" solo aparece si el servidor del juego está corriendo
+     * (npm start o Render). En GitHub Pages, Live Server o sin internet no se muestra.
+     */
+    async revisarServidor() {
+      this.sinServidor = true;
+      const tarjeta = $('[data-modo="online"]');
+      tarjeta.classList.add('oculto');
+      if (C.MODO_DEMO || (location.protocol !== 'http:' && location.protocol !== 'https:')) return;
+      let url = location.origin + '/salud';
+      if (C.SERVIDOR_URL) url = C.SERVIDOR_URL.replace(/^ws/, 'http').replace(/\/ws\/?$/, '') + '/salud';
+      const control = new AbortController();
+      const limite = setTimeout(() => control.abort(), 4000);
+      try {
+        const r = await fetch(url, { cache: 'no-store', signal: control.signal });
+        const d = r.ok ? await r.json() : null;
+        if (d && d.ok) {
+          this.sinServidor = false;
+          tarjeta.classList.remove('oculto');
+        }
+      } catch (e) {
+        /* sin servidor: el botón sigue oculto */
+      } finally {
+        clearTimeout(limite);
+      }
     },
 
     /** Guarda la página para abrirla sin internet (solo web: no instala nada). */
@@ -304,47 +326,12 @@
       this.prepararPartida(modo);
     },
 
-    /** Pantalla de la mesa 3D: marcador para imprimir y pasos. */
-    abrirAR() {
-      this.sonidos.activar();
-      this.sonidos.boton();
-      if (C.MODO_DEMO) {
-        this.aviso('La mesa 3D necesita la cámara: ejecuta el proyecto con <b>npm start</b> (mira el README).', 4500);
-        return;
-      }
-      const img = $('#img-marcador');
-      if (!img.dataset.cargada) {
-        img.dataset.cargada = '1';
-        img.classList.remove('oculto');
-        $('#marcador-falla').classList.add('oculto');
-        $('#link-marcador').classList.remove('oculto');
-        const urls = C.MARCADOR_HIRO;
-        let i = 0;
-        img.onerror = () => {
-          i++;
-          if (i < urls.length) {
-            img.src = urls[i];
-            $('#link-marcador').href = urls[i];
-          } else {
-            // sin internet: un aviso del mismo tamaño que la imagen
-            img.classList.add('oculto');
-            $('#marcador-falla').classList.remove('oculto');
-            $('#link-marcador').classList.add('oculto');
-            img.dataset.cargada = ''; // se vuelve a intentar la próxima vez
-          }
-        };
-        img.src = urls[0];
-        $('#link-marcador').href = urls[0];
-      }
-      this.mostrar('p-ar');
-    },
-
-    async prepararPartida(modo, rol = null, opciones = {}) {
-      this.ultimaPrep = { modo, rol, opciones };
+    async prepararPartida(modo, rol = null) {
+      this.ultimaPrep = { modo, rol };
       const token = ++this.tokenPrep;
       this.modo = modo;
       this.rol = rol;
-      this.vistaAR = !!opciones.ar;
+      this.apodoRival = '';
       this.humanos = modo === 'local' ? [0, 1] : modo === 'cpu' ? [0] : rol === 'anfitrion' ? [0] : [1];
       this.partido = new FG.Partido({ golesParaGanar: this.ajustes.goles });
       this.cpu = modo === 'cpu' ? new FG.CPU(this.partido, 1, this.ajustes.dificultad) : null;
@@ -360,15 +347,14 @@
       this.pausaGolpe = 0;
       this.camaraLenta = 0;
       this.pausaRed = null;
-      this.controlActual = this.vistaAR ? 'manos' : C.MODO_DEMO ? 'tactil' : this.ajustes.control;
+      this.controlActual = C.MODO_DEMO ? 'tactil' : this.ajustes.control;
       this.puntero.reiniciar();
       this.gestos.reiniciar();
 
       // la primera vez: mini video de cómo se juega (con cámara o con mouse/táctil)
-      // (la mesa 3D tiene su propia pantalla de pasos)
       const variante = this.controlActual === 'manos' ? 'manos' : 'tactil';
       const clave = variante === 'manos' ? 'tutorialManos' : 'tutorialTactil';
-      if (!this.vistaAR && !U.leer(clave, false)) {
+      if (!U.leer(clave, false)) {
         this.fase = 'tutorial';
         const completo = await this.tutorial.abrir(variante, {
           final: variante === 'manos' ? 'Listo, encender la cámara' : '¡A jugar!'
@@ -378,10 +364,7 @@
       }
       this.fase = 'carga';
 
-      if (this.vistaAR) {
-        const ok = await this.prepararAR(token);
-        if (!ok || token !== this.tokenPrep) return;
-      } else if (this.controlActual === 'manos') {
+      if (this.controlActual === 'manos') {
         const ok = await this.prepararCamara(token);
         if (!ok || token !== this.tokenPrep) return;
       }
@@ -390,18 +373,17 @@
 
     reintentar() {
       if (!this.ultimaPrep) return this.irAlMenu();
-      this.prepararPartida(this.ultimaPrep.modo, this.ultimaPrep.rol, this.ultimaPrep.opciones);
+      this.prepararPartida(this.ultimaPrep.modo, this.ultimaPrep.rol);
     },
 
     /** Pantalla de carga: marca cada paso como activo, hecho o con error. */
-    pantallaCarga(conAR) {
+    pantallaCarga() {
       this.mostrar('p-carga');
-      const pasos = { camara: $('#paso-camara'), ar: $('#paso-ar'), modelo: $('#paso-modelo') };
+      const pasos = { camara: $('#paso-camara'), modelo: $('#paso-modelo') };
       Object.values(pasos).forEach((p) => (p.dataset.estado = ''));
-      pasos.ar.classList.toggle('oculto', !conAR);
       $('#carga-error').classList.add('oculto');
       $('#carga-spinner').classList.remove('oculto');
-      $('#carga-titulo').textContent = conAR ? 'Preparando la mesa 3D…' : 'Preparando…';
+      $('#carga-titulo').textContent = 'Preparando…';
       return pasos;
     },
 
@@ -413,48 +395,8 @@
       $('#carga-error').classList.remove('oculto');
     },
 
-    /** Mesa 3D: AR.js abre la cámara y sigue el marcador; MediaPipe usa ese mismo video. */
-    async prepararAR(token) {
-      const pasos = this.pantallaCarga(true);
-      let paso = null;
-      const marcar = (p, estado) => {
-        p.dataset.estado = estado;
-        if (estado === 'activo') paso = p;
-      };
-      try {
-        // si la cámara de la pantalla normal estaba abierta, se cierra: AR.js abre la suya
-        FG.Camara.detener();
-        this.video.srcObject = null;
-        if (!this.ar) this.ar = new FG.RenderAR($('#contenedor-ar'));
-        marcar(pasos.camara, 'activo');
-        if (!this.ar.video) await this.ar.verificarCamara();
-        marcar(pasos.camara, 'hecho');
-        if (token !== this.tokenPrep) return false;
-
-        marcar(pasos.ar, 'activo');
-        await this.ar.cargarLibrerias();
-        document.body.classList.add('modo-ar');
-        if (!this.ar.video) await this.ar.crearEscena();
-        this.camAR = FG.CamaraAR.desdeAR(this.ar);
-        this.videoActivo = this.ar.video;
-        marcar(pasos.ar, 'hecho');
-        if (token !== this.tokenPrep) return false;
-
-        marcar(pasos.modelo, 'activo');
-        await this.tracker.cargar(2);
-        if (token !== this.tokenPrep) return false;
-        marcar(pasos.modelo, 'hecho');
-        return true;
-      } catch (e) {
-        console.error('[FingerGol] error al preparar la mesa 3D', e);
-        if (token !== this.tokenPrep) return false;
-        this.errorCarga(e, paso);
-        return false;
-      }
-    },
-
     async prepararCamara(token) {
-      const pasos = this.pantallaCarga(false);
+      const pasos = this.pantallaCarga();
       let paso = null;
       const marcar = (p, estado) => {
         p.dataset.estado = estado;
@@ -485,25 +427,14 @@
     entrarEscenario() {
       this.mostrar(null);
       const conManos = this.controlActual === 'manos';
-      const conCamaraPantalla = conManos && !this.vistaAR;
       document.body.classList.add('en-juego');
-      document.body.classList.toggle('con-camara', conCamaraPantalla);
+      document.body.classList.toggle('con-camara', conManos);
       document.body.classList.toggle('con-manos', conManos);
-
-      if (this.vistaAR) {
-        if (!this.render3D) this.render3D = new FG.Render3D(this.lienzo);
-        this.render3D.ahorro = this.ahorro;
-        this.render3D.usarCamara(this.camAR);
-        this.renderer = this.render3D;
-        this.aplicarMovimiento();
-      } else {
-        this.renderer = this.render2D;
-        this.render2D.conCamara = conCamaraPantalla;
-        // zona cómoda: el video se ve más grande, así el centro de la cámara cubre toda la mesa
-        const zoom = conCamaraPantalla ? 1 / Math.min(1, Math.max(0.5, C.ZONA_MANO || 1)) : 1;
-        this.render2D.zoomVideo = zoom;
-        this.video.style.transform = zoom > 1 ? `scaleX(-1) scale(${zoom.toFixed(3)})` : '';
-      }
+      this.renderer.conCamara = conManos;
+      // zona cómoda: el video se ve más grande, así el centro de la cámara cubre toda la mesa
+      const zoom = conManos ? 1 / Math.min(1, Math.max(0.5, C.ZONA_MANO || 1)) : 1;
+      this.renderer.zoomVideo = zoom;
+      this.video.style.transform = zoom > 1 ? `scaleX(-1) scale(${zoom.toFixed(3)})` : '';
       $('#hud').classList.remove('oculto');
       $('#btn-pausa').innerHTML = this.modo === 'online' ? ICONOS.cerrar : ICONOS.pausa;
       this.actualizarNombres();
@@ -516,7 +447,6 @@
 
     abrirLobby() {
       this.fase = 'lobby';
-      this._buscandoMarcador = undefined;
       const lobby = $('#p-lobby');
       lobby.classList.add('activa');
       lobby.classList.toggle('sin-lados', this.controlActual !== 'manos');
@@ -525,45 +455,22 @@
         $(`#lado${lado}-nombre`).textContent = nombres[lado];
         $(`#lado${lado}`).classList.toggle('remoto', !this.humanos.includes(lado));
       });
-      this.textosLobby();
-      $('#lobby-tip').textContent = this.vistaAR
-        ? 'El celular o el portátil quieto, viendo la mesa desde arriba.'
-        : 'Con buena luz y la mano a 40–70 cm de la cámara.';
-      $('#btn-empezar-ya').classList.toggle('oculto', this.modo === 'online' && this.rol === 'invitado');
-      $('#lobby-gesto').classList.toggle('oculto', this.modo === 'online'); // en línea no hay pausa
-    },
-
-    /** Títulos del lobby (en la mesa 3D, primero hay que encontrar el marcador). */
-    textosLobby() {
-      const buscandoMarcador = this.vistaAR && !(this.camAR && this.camAR.visible());
-      if (buscandoMarcador === this._buscandoMarcador) return;
-      this._buscandoMarcador = buscandoMarcador;
-      $('#p-lobby').classList.toggle('sin-lados', this.controlActual !== 'manos' || buscandoMarcador);
-      if (buscandoMarcador) {
-        $('#lobby-titulo').textContent = 'Apunta la cámara al marcador';
-        $('#lobby-sub').textContent = 'Pon el marcador Hiro plano en el centro de tu mesa. La mesa 3D aparece encima.';
-        return;
-      }
       $('#lobby-titulo').textContent = this.controlActual === 'manos' ? 'Muestra tu mano' : 'Esperando a tu rival…';
       $('#lobby-sub').textContent =
         this.controlActual === 'manos'
           ? this.humanos.length === 2
-            ? this.vistaAR
-              ? 'Cada jugador toca la mesa con el dedo índice en su lado.'
-              : 'Cada jugador apunta con el dedo índice en su lado.'
-            : this.vistaAR
-              ? 'Toca la mesa con el dedo índice. Tu mazo seguirá a tu dedo.'
-              : 'Apunta con el dedo índice. Tu mazo seguirá a tu dedo.'
+            ? 'Cada jugador apunta con el dedo índice en su lado.'
+            : 'Apunta con el dedo índice. Tu mazo seguirá a tu dedo.'
           : 'El partido empieza cuando los dos estén listos.';
+      $('#btn-empezar-ya').classList.toggle('oculto', this.modo === 'online' && this.rol === 'invitado');
+      $('#lobby-gesto').classList.toggle('oculto', this.modo === 'online'); // en línea no hay pausa
     },
 
     ocultarLobby() {
       $('#p-lobby').classList.remove('activa');
-      this._buscandoMarcador = undefined;
     },
 
     actualizarLobby(asig, dt) {
-      this.textosLobby();
       const manos = this.controlActual === 'manos';
       for (const lado of this.humanos) {
         if (!manos) this.listo[lado] = LISTO_SEG;
@@ -594,7 +501,7 @@
       if (!localesListos) return;
       if (this.modo === 'online') {
         if (!this.listoEnviado) {
-          this.red.enviar({ t: 'listo' });
+          this.red.enviar({ t: 'listo', apodo: this.ajustes.apodos[0] });
           this.listoEnviado = true;
         }
         if (this.rol === 'anfitrion' && this.rivalListo) this.empezarPartido();
@@ -608,7 +515,7 @@
       this.sonidos.activar();
       if (this.modo === 'online') {
         if (this.rol === 'anfitrion') {
-          this.red.enviar({ t: 'listo' });
+          this.red.enviar({ t: 'listo', apodo: this.ajustes.apodos[0] });
           this.empezarPartido();
         }
         return;
@@ -747,17 +654,11 @@
         this.red.cerrar();
         this.red = null;
       }
-      if (document.body.classList.contains('modo-ar')) {
-        location.reload(); // AR.js deja su cámara y su escena abiertas: recargar es lo más limpio
-        return;
-      }
       this.ocultarAvisoRed(false);
       FG.Camara.detener();
       this.video.srcObject = null;
       this.video.style.transform = '';
       this.render2D.zoomVideo = 1;
-      this.vistaAR = false;
-      this.renderer = this.render2D;
       this.gestos.reiniciar();
       this.partido = null;
       this.cpu = null;
@@ -775,14 +676,16 @@
 
     /* ====================== MARCADOR / NOMBRES ====================== */
     nombresCortos() {
-      if (this.modo === 'local') return ['JUGADOR 1', 'JUGADOR 2'];
-      if (this.modo === 'cpu') return ['TÚ', 'MÁQUINA'];
-      return this.rol === 'anfitrion' ? ['TÚ', 'RIVAL'] : ['RIVAL', 'TÚ'];
+      return this.nombresLargos().map((n) => n.toUpperCase());
     },
+    /** Usa los apodos de Ajustes; si están vacíos, el nombre normal. */
     nombresLargos() {
-      if (this.modo === 'local') return ['Jugador 1', 'Jugador 2'];
-      if (this.modo === 'cpu') return ['Tú', 'Máquina'];
-      return this.rol === 'anfitrion' ? ['Tú', 'Rival'] : ['Rival', 'Tú'];
+      const a = this.ajustes.apodos;
+      if (this.modo === 'local') return [a[0] || 'Jugador 1', a[1] || 'Jugador 2'];
+      const yo = a[0] || 'Tú';
+      if (this.modo === 'cpu') return [yo, 'Máquina'];
+      const rival = this.apodoRival || 'Rival';
+      return this.rol === 'anfitrion' ? [yo, rival] : [rival, yo];
     },
     etiquetas() {
       if (this.modo === 'local') return ['1', '2'];
@@ -820,12 +723,12 @@
         const manos = this.ahorro && this._cuadro % 2 ? this.tracker.manos : this.tracker.detectar(this.videoActivo, ahora);
         this.manosCrudas = manos;
         for (const m of manos) {
-          const puntos = m.puntos.map((p) => this.videoAPantalla(p.x, p.y));
+          const puntos = m.puntos.map((p) => this.renderer.videoAPantalla(p.x, p.y));
           const dib = { puntos, color: '#dfe6ff' };
           this.manosDibujo.push(dib);
-          const f = this.pantallaAMesa(puntos[8][0], puntos[8][1]);
+          const f = this.renderer.pantallaACancha(puntos[8][0], puntos[8][1]);
           if (!f) continue;
-          const fm = this.pantallaAMesa(puntos[0][0], puntos[0][1]) || f;
+          const fm = this.renderer.pantallaACancha(puntos[0][0], puntos[0][1]) || f;
           lista.push({ x: f[0], y: f[1], xLado: fm[0], mano: m, dib });
         }
       }
@@ -837,16 +740,6 @@
       }
       for (const k of this.puntero.teclado(dt, this.partido)) lista.push(k);
       return lista;
-    },
-
-    /** Punto del video (0..1) -> píxel de pantalla (en la mesa 3D el video no va en espejo). */
-    videoAPantalla(nx, ny) {
-      return this.vistaAR ? this.ar.videoAPantalla(nx, ny) : this.render2D.videoAPantalla(nx, ny);
-    },
-    /** Píxel de pantalla -> punto de la mesa (en la mesa 3D: donde el dedo toca tu mesa). */
-    pantallaAMesa(sx, sy) {
-      if (!this.vistaAR) return this.render2D.pantallaACancha(sx, sy);
-      return this.camAR && this.camAR.visible() ? this.camAR.pantallaAPlano(sx, sy) : null;
     },
 
     /* ====================== GESTOS ====================== */
@@ -877,7 +770,7 @@
           (a, i) => [a[0] + r.mano.puntos[i].x / 5, a[1] + r.mano.puntos[i].y / 5],
           [0, 0]
         );
-        this.gestoVista = { punto: this.videoAPantalla(centro[0], centro[1]), progreso: r.progreso, texto: 'Pausa' };
+        this.gestoVista = { punto: this.renderer.videoAPantalla(centro[0], centro[1]), progreso: r.progreso, texto: 'Pausa' };
       }
       if (!r.listo) return;
       this.sonidos.boton();
@@ -915,10 +808,6 @@
       this.ahorro = true;
       this.render2D.ahorro = true;
       this.render2D.ajustar();
-      if (this.render3D) {
-        this.render3D.ahorro = true;
-        this.render3D.ajustar();
-      }
       document.body.classList.add('ahorro');
       this.aviso('Modo ahorro: quitamos brillos para que el juego vaya fluido.', 3500);
     },
@@ -994,12 +883,6 @@
       const dt = Math.min(0.05, crudo);
       this.tPrev = ahora;
 
-      // mesa 3D: seguir el marcador y recalcular la cámara
-      if (this.ar && this.ar.ancla) {
-        this.ar.actualizar(dt);
-        if (this.camAR) this.camAR.preparar();
-      }
-
       if (!this.partido || this.fase === 'menu' || this.fase === 'carga' || this.fase === 'tutorial') {
         this.bucleFondo(dt);
         return;
@@ -1059,20 +942,13 @@
         manos: this.manosDibujo,
         etiquetas: this._etiquetas,
         locales: this.humanos,
-        avisos: this.controlActual === 'manos' && (this.fase === 'juego' || this.fase === 'lobby'),
-        rotulos: this.vistaAR && this.fase === 'lobby' ? this.nombresLargos() : null
+        avisos: this.controlActual === 'manos' && (this.fase === 'juego' || this.fase === 'lobby')
       });
       if (this.gestoVista) this.renderer.dibujarGesto(this.gestoVista);
     },
 
     /** En el menú se ve un partido de fondo entre dos máquinas. */
     bucleFondo(dt) {
-      if (document.body.classList.contains('modo-ar')) {
-        // en la mesa 3D (cargando) no hay partido de fondo: se ve la cámara
-        this.renderer.ctx.setTransform(1, 0, 0, 1, 0, 0);
-        this.renderer.ctx.clearRect(0, 0, this.lienzo.width, this.lienzo.height);
-        return;
-      }
       if (!this.fondo) {
         const p = new FG.Partido({ golesParaGanar: 999 });
         p.iniciar();
@@ -1179,7 +1055,7 @@
       let quien;
       if (this.modo === 'local') quien = 'de ' + this.nombresLargos()[equipo];
       else if (this.humanos.includes(equipo)) quien = '¡Golazo tuyo!';
-      else quien = this.modo === 'cpu' ? 'de la máquina' : 'de tu rival';
+      else quien = this.modo === 'cpu' ? 'de la máquina' : this.apodoRival ? 'de ' + this.apodoRival : 'de tu rival';
       return `<span class="gol-txt">¡GOOOL!</span><span class="gol-quien" style="color:${color}">${quien}</span>`;
     },
 
@@ -1224,8 +1100,15 @@
         this.entradaRival = m.x == null ? null : { x: m.x, y: m.y };
         this.tEntradaRival = performance.now();
       });
-      red.on('listo', () => {
+      red.on('listo', (m) => {
         this.rivalListo = true;
+        const apodo = limpiarApodo(m && m.apodo);
+        if (apodo !== this.apodoRival) {
+          this.apodoRival = apodo;
+          this.actualizarNombres();
+          const nombres = this.nombresLargos();
+          [0, 1].forEach((lado) => { $(`#lado${lado}-nombre`).textContent = nombres[lado]; });
+        }
       });
       red.on('revancha', () => {
         if (this.rol === 'anfitrion' && this.fase === 'fin') {

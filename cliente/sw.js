@@ -6,33 +6,31 @@
    - Archivos del juego (html, css, js): primero intenta la red
      (así siempre ves la última versión) y si no hay internet usa
      la copia guardada.
-   - MediaPipe, su modelo de la mano, las letras y AR.js: usa la
+   - MediaPipe, su modelo de la mano y las letras: usa la
      copia guardada (son archivos que no cambian) y si no la hay,
      la descarga y la guarda.
    Al cambiar VERSION se borran las copias viejas.
    ============================================================ */
-const VERSION = 'fingergol-1.5.0';
+const VERSION = 'fingergol-1.5.2';
 
 const ARCHIVOS = [
   './',
   'index.html',
-  'css/estilos.css?v=1.5.0',
+  'css/estilos.css?v=1.5.2',
   'assets/icono.svg',
-  'js/config.js?v=1.5.0',
-  'js/utilidades.js?v=1.5.0',
-  'js/audio/sonidos.js?v=1.5.0',
-  'js/juego/fisica.js?v=1.5.0',
-  'js/juego/cpu.js?v=1.5.0',
-  'js/entrada/camara.js?v=1.5.0',
-  'js/entrada/hand-tracker.js?v=1.5.0',
-  'js/entrada/gestos.js?v=1.5.0',
-  'js/entrada/puntero.js?v=1.5.0',
-  'js/render/render-pantalla.js?v=1.5.0',
-  'js/render/render-3d.js?v=1.5.0',
-  'js/ar/ar.js?v=1.5.0',
-  'js/red/red.js?v=1.5.0',
-  'js/tutorial/tutorial.js?v=1.5.0',
-  'js/app.js?v=1.5.0'
+  'js/config.js?v=1.5.2',
+  'js/utilidades.js?v=1.5.2',
+  'js/audio/sonidos.js?v=1.5.2',
+  'js/juego/fisica.js?v=1.5.2',
+  'js/juego/cpu.js?v=1.5.2',
+  'js/entrada/camara.js?v=1.5.2',
+  'js/entrada/hand-tracker.js?v=1.5.2',
+  'js/entrada/gestos.js?v=1.5.2',
+  'js/entrada/puntero.js?v=1.5.2',
+  'js/render/render-pantalla.js?v=1.5.2',
+  'js/red/red.js?v=1.5.2',
+  'js/tutorial/tutorial.js?v=1.5.2',
+  'js/app.js?v=1.5.2'
 ];
 
 // librerías y archivos de otros sitios que vale la pena guardar
@@ -40,10 +38,7 @@ const EXTERNOS = [
   'cdn.jsdelivr.net',
   'storage.googleapis.com',
   'fonts.googleapis.com',
-  'fonts.gstatic.com',
-  'aframe.io',
-  'raw.githack.com',
-  'raw.githubusercontent.com'
+  'fonts.gstatic.com'
 ];
 
 self.addEventListener('install', (ev) => {
@@ -70,6 +65,7 @@ self.addEventListener('fetch', (ev) => {
   const url = new URL(req.url);
 
   if (url.origin === self.location.origin) {
+    // /salud dice si el servidor está corriendo: siempre se pregunta a la red
     if (url.pathname.endsWith('/salud') || url.pathname.endsWith('/ws')) return;
     ev.respondWith(redPrimero(req));
     return;

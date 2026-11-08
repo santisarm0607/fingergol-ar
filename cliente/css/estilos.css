@@ -1,5 +1,5 @@
 /* ============================================================
-   FingerGol AR — estilos (versión 1.5: "mesa de air hockey neón")
+   FingerGol AR — estilos (versión 1.5.1: "mesa de air hockey neón")
    Idea: una máquina de air hockey de salón de juegos. La mesa es
    índigo con los huequitos del aire, las líneas son tubos de neón
    (azul celeste para un equipo, fucsia para el otro) y el disco
@@ -71,14 +71,6 @@ kbd {
 }
 body.con-camara #video { display: block; }
 #lienzo { position: absolute; inset: 0; touch-action: none; }
-
-/* Mesa 3D (AR.js): AR.js pone su propio video detrás de todo (z-index negativo),
-   así que el fondo de la página debe quedar transparente para que se vea. */
-#contenedor-ar { position: absolute; inset: 0; display: none; }
-body.modo-ar #contenedor-ar { display: block; }
-body.modo-ar #escenario { background: transparent; }
-body.modo-ar #lienzo { pointer-events: none; }
-body.modo-ar { background: transparent; }
 
 /* ================= HUD ================= */
 #hud {
@@ -305,8 +297,6 @@ body.modo-ar { background: transparent; }
 .modo .txt { display: flex; flex-direction: column; }
 .modo .tit { font-size: 26px; font-weight: 700; line-height: 1.05; }
 .modo .sub { font-size: 16px; color: var(--sub); line-height: 1.2; }
-.modo.deshabilitado { opacity: 0.45; border-style: dashed; }
-.modo.deshabilitado:hover { box-shadow: none; }
 
 /* pasos: sí son una secuencia */
 .como-jugar {
@@ -363,6 +353,25 @@ body.modo-ar { background: transparent; }
   font-size: 16px;
   font-weight: 700;
 }
+.apodos { display: flex; flex-wrap: wrap; gap: 8px; }
+.apodo { display: flex; flex-direction: column; gap: 2px; font-size: 13px; font-weight: 700; }
+.apodo0 { color: var(--azul); }
+.apodo1 { color: var(--rojo); }
+.apodo input {
+  width: 9.5em;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 2px solid var(--azul);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--texto);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  user-select: text;
+}
+.apodo1 input { border-color: var(--rojo); }
+.apodo input::placeholder { color: var(--sub); opacity: 0.7; }
+.apodo input:focus { outline: 2px solid var(--disco); outline-offset: 1px; }
 .segmentos button.activo { background: var(--disco); color: var(--mesa-oscura); }
 .enlace { border: 0; background: none; color: var(--azul); padding: 0; font: inherit; text-decoration: underline; }
 .pie { margin-top: 18px; text-align: center; font-size: 15px; color: var(--sub); }
@@ -652,75 +661,6 @@ body.vertical .lobby-centro { top: 50%; transform: translate(-50%, -50%); }
   .btn-tutorial { margin-bottom: 10px; padding: 8px 14px; }
 }
 
-/* ================= MESA 3D (AR) ================= */
-.btn-ar {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  width: 100%;
-  margin: 12px 0 0;
-  padding: 10px 16px;
-  border-radius: 14px;
-  border: 2px solid var(--verde);
-  background: rgba(13, 10, 51, 0.82);
-  text-align: left;
-  box-shadow: inset 0 0 18px -12px var(--verde);
-  transition: box-shadow 0.15s, transform 0.1s;
-}
-.btn-ar:hover { box-shadow: 0 0 22px -6px var(--verde), inset 0 0 20px -10px var(--verde); }
-.btn-ar:active { transform: scale(0.98); }
-.btn-ar.deshabilitado { opacity: 0.5; border-style: dashed; }
-.btn-ar .cubo {
-  flex: none;
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  color: var(--mesa-oscura);
-  background: var(--verde);
-}
-.btn-ar .txt { display: flex; flex-direction: column; }
-.btn-ar b { font-size: 23px; font-weight: 700; line-height: 1.05; }
-.btn-ar small { font-size: 15px; color: var(--sub); }
-
-.tarjeta.ar-prep { max-width: 640px; }
-.ar-cuerpo { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; }
-.marcador { margin: 0; width: 166px; text-align: center; }
-.marcador-falla {
-  width: 166px;
-  min-height: 166px;
-  display: grid;
-  place-items: center;
-  padding: 12px;
-  border-radius: 8px;
-  border: 2px dashed var(--verde);
-  font-size: 15px;
-  line-height: 1.3;
-  color: var(--sub);
-}
-.marcador img {
-  display: block;
-  width: 150px;
-  height: 150px;
-  padding: 8px;
-  border-radius: 8px;
-  background: #ffffff;
-  object-fit: contain;
-}
-.marcador figcaption { margin-top: 6px; font-size: 15px; }
-.marcador a { color: var(--verde); }
-.ar-pasos { margin: 0; padding-left: 22px; display: grid; gap: 8px; font-size: 17px; line-height: 1.35; }
-.ar-pasos b { color: var(--texto); }
-.ar-pasos li::marker { color: var(--verde); font-weight: 700; }
-.ar-prep .botones .btn { flex: 1 1 200px; width: auto; }
-@media (max-width: 520px) {
-  .ar-cuerpo { grid-template-columns: 1fr; justify-items: center; }
-  .marcador, .marcador-falla { width: 136px; }
-  .marcador img { width: 120px; height: 120px; }
-  .marcador-falla { min-height: 120px; }
-}
-
 /* ================= GESTOS ================= */
 .lobby-centro .lobby-gesto { color: var(--disco); font-size: 16px; }
 .pista-gesto {
@@ -819,7 +759,7 @@ body.demo #p-inicio { padding-bottom: 60px; }
   .como-jugar { grid-template-columns: 1fr; gap: 6px; }
   .como-jugar li { display: flex; align-items: baseline; gap: 10px; }
   .como-jugar li::before { display: inline; font-size: 22px; }
-  #marcador .nombre { display: none; }
+  #marcador .nombre { font-size: 12px; max-width: 20vw; padding: 0 2px; }
   .codigo { font-size: 52px; }
 }
 @media (max-height: 520px) and (orientation: landscape) {
@@ -835,35 +775,22 @@ body.demo #p-inicio { padding-bottom: 60px; }
   }
   .marquesina { grid-column: 1; grid-row: 1; margin-bottom: 10px; }
   .btn-tutorial { grid-column: 1; grid-row: 2; }
-  .btn-ar { grid-column: 1; grid-row: 3; margin: 0; }
   .como-jugar { display: none; }
-  .modos { grid-column: 2; grid-row: 1 / span 3; gap: 8px; align-self: center; }
-  .ajustes { grid-column: 2; grid-row: 4; margin-top: 8px; }
-  .pie { grid-column: 1; grid-row: 4; margin-top: 10px; align-self: end; text-align: left; font-size: 14px; }
+  .modos { grid-column: 2; grid-row: 1 / span 2; gap: 8px; align-self: center; }
+  .ajustes { grid-column: 2; grid-row: 3; margin-top: 8px; }
+  .pie { grid-column: 1; grid-row: 3; margin-top: 10px; align-self: end; text-align: left; font-size: 14px; }
   .titulo { font-size: 44px; }
   .lema { font-size: 15px; margin-top: 6px; }
   .modo { padding: 8px 12px; gap: 12px; }
   .boton-arcade { width: 30px; height: 30px; }
   .modo .tit { font-size: 21px; }
   .modo .sub { font-size: 14px; }
-  .btn-tutorial, .btn-ar { padding: 6px 12px; gap: 10px; }
-  .btn-tutorial .play, .btn-ar .cubo { width: 34px; height: 34px; }
-  .btn-tutorial b, .btn-ar b { font-size: 19px; }
-  .btn-tutorial small, .btn-ar small { font-size: 13px; }
+  .btn-tutorial { padding: 6px 12px; gap: 10px; }
+  .btn-tutorial .play { width: 34px; height: 34px; }
+  .btn-tutorial b { font-size: 19px; }
+  .btn-tutorial small { font-size: 13px; }
   .ajustes summary { padding: 8px 2px 6px; }
   .ajustes-tit { font-size: 18px; }
-  .tarjeta.ar-prep { max-width: 760px; padding: 12px 18px 14px; }
-  .ar-prep .btn-volver { margin-bottom: 4px; }
-  .ar-prep h2 { font-size: 24px; margin-bottom: 6px; }
-  .ar-prep .sub-tarjeta { display: none; }
-  .ar-cuerpo { grid-template-columns: auto 1fr; gap: 14px; }
-  .marcador, .marcador-falla { width: 120px; }
-  .marcador img { width: 120px; height: 120px; }
-  .marcador-falla { min-height: 120px; font-size: 14px; padding: 6px; }
-  .marcador figcaption { font-size: 13px; }
-  .ar-pasos { font-size: 15px; gap: 4px; }
-  .ar-prep .botones { margin-top: 8px; }
-  .ar-prep .btn.grande { font-size: 19px; padding: 8px 16px; }
   .lado .mano-anim { width: 40px; height: 40px; }
   .lado-nombre { font-size: 22px; }
   .lobby-centro { top: 64px; padding: 8px 14px; }

@@ -61,7 +61,8 @@ const servidor = http.createServer((req, res) => {
     return res.end('Ruta inválida');
   }
   if (ruta === '/salud') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
+    // la página pregunta esto para saber si mostrar el botón "En línea"
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' });
     return res.end(JSON.stringify({ ok: true, salas: salas.size }));
   }
   if (ruta.endsWith('/')) ruta += 'index.html';

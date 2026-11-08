@@ -10,14 +10,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Monoton&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/estilos.css?v=1.5.0">
+  <link rel="stylesheet" href="css/estilos.css?v=1.5.2">
 </head>
 <body>
 
   <!-- ================= ESCENARIO (cámara + mesa) ================= -->
   <div id="escenario">
     <video id="video" playsinline muted autoplay></video>
-    <div id="contenedor-ar"></div>
     <canvas id="lienzo"></canvas>
   </div>
 
@@ -74,16 +73,12 @@
           <span class="boton-arcade" aria-hidden="true"></span>
           <span class="txt"><span class="tit">2 jugadores</span><span class="sub">Una mano cada uno, misma cámara</span></span>
         </button>
-        <button class="modo modo-online" data-modo="online">
+        <!-- solo aparece si el servidor del juego está corriendo (npm start o Render) -->
+        <button class="modo modo-online oculto" data-modo="online">
           <span class="boton-arcade" aria-hidden="true"></span>
           <span class="txt"><span class="tit">En línea</span><span class="sub" id="sub-online">Con un amigo en otro dispositivo</span></span>
         </button>
       </div>
-
-      <button class="btn-ar" id="btn-ar">
-        <span class="cubo" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg></span>
-        <span class="txt"><b>Mesa 3D sobre tu mesa</b><small id="sub-ar">Realidad aumentada con un marcador impreso</small></span>
-      </button>
 
       <ol class="como-jugar" aria-label="Cómo se juega">
         <li>Muestra tu dedo índice a la cámara.</li>
@@ -124,10 +119,18 @@
           </div>
         </div>
         <p class="nota">"Reducido" quita el temblor, los destellos y las animaciones (por si te mareas).</p>
+        <div class="fila">
+          <span class="etq">Apodos</span>
+          <div class="apodos">
+            <label class="apodo apodo0"><span>Jugador 1</span><input id="apodo0" type="text" maxlength="10" placeholder="Jugador 1" autocomplete="off" spellcheck="false"></label>
+            <label class="apodo apodo1"><span>Jugador 2</span><input id="apodo1" type="text" maxlength="10" placeholder="Jugador 2" autocomplete="off" spellcheck="false"></label>
+          </div>
+        </div>
+        <p class="nota">El apodo del jugador 1 también es el tuyo contra la máquina y en línea. Déjalo vacío para usar el nombre normal.</p>
         <p class="nota">Sin cámara: el jugador 1 usa <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> y el jugador 2 las <kbd>flechas</kbd>, o toquen la pantalla con un dedo cada uno.</p>
       </details>
 
-      <footer class="pie">Hecho por <b>SantiSarm</b>, versión 1.5</footer>
+      <footer class="pie">Hecho por <b>SantiSarm</b>, versión 1.5.2</footer>
     </div>
   </section>
 
@@ -152,31 +155,6 @@
         <button class="btn sec tut-atras" id="tut-atras" aria-label="Paso anterior"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
         <div class="tut-puntos" id="tut-puntos"></div>
         <button class="btn" id="tut-sig">Siguiente</button>
-      </div>
-    </div>
-  </section>
-
-  <!-- ================= MESA 3D (AR.js) ================= -->
-  <section id="p-ar" class="pantalla">
-    <div class="tarjeta ar-prep">
-      <button class="btn-volver" data-volver>← Volver</button>
-      <h2>Mesa 3D sobre tu mesa</h2>
-      <p class="sub-tarjeta">La mesa de air hockey aparece encima de un marcador. Juegas con el dedo índice sobre tu mesa de verdad.</p>
-      <div class="ar-cuerpo">
-        <figure class="marcador">
-          <img id="img-marcador" alt="Marcador Hiro: un cuadrado negro con la palabra Hiro" width="150" height="150">
-          <div class="marcador-falla oculto" id="marcador-falla"><span>Sin internet. Busca <b>marcador Hiro</b> en Google.</span></div>
-          <figcaption><a id="link-marcador" target="_blank" rel="noopener">Abrir el marcador para imprimir</a></figcaption>
-        </figure>
-        <ol class="ar-pasos">
-          <li><b>Imprime el marcador</b> (unos 10 cm) o ábrelo en otro celular, y ponlo plano en el centro de la mesa.</li>
-          <li><b>Apoya el celular o el portátil quieto</b>, con la cámara viendo la mesa desde arriba y un poco de lado.</li>
-          <li><b>Juega con el dedo índice</b> tocando la mesa. Si tapas el marcador con la mano, la mesa se queda en su lugar.</li>
-        </ol>
-      </div>
-      <div class="botones">
-        <button class="btn grande" data-ar-modo="cpu">Contra la máquina</button>
-        <button class="btn sec grande" data-ar-modo="local">2 jugadores</button>
       </div>
     </div>
   </section>
@@ -212,7 +190,6 @@
       <h2 id="carga-titulo">Preparando…</h2>
       <ul class="pasos oculto">
         <li id="paso-camara"><span class="ic"></span><span><b>Encender la cámara</b><small>Pulsa “Permitir” si el navegador lo pregunta</small></span></li>
-        <li id="paso-ar" class="oculto"><span class="ic"></span><span><b>Preparar la realidad aumentada</b><small>Descarga AR.js (solo la primera vez)</small></span></li>
         <li id="paso-modelo"><span class="ic"></span><span><b>Cargar el detector de manos</b><small>La primera vez tarda unos segundos</small></span></li>
       </ul>
       <div id="carga-error" class="oculto">
@@ -305,20 +282,18 @@
   </section>
 
   <!-- Scripts en orden: configuración → utilidades → módulos → app -->
-  <script src="js/config.js?v=1.5.0"></script>
-  <script src="js/utilidades.js?v=1.5.0"></script>
-  <script src="js/audio/sonidos.js?v=1.5.0"></script>
-  <script src="js/juego/fisica.js?v=1.5.0"></script>
-  <script src="js/juego/cpu.js?v=1.5.0"></script>
-  <script src="js/entrada/camara.js?v=1.5.0"></script>
-  <script src="js/entrada/hand-tracker.js?v=1.5.0"></script>
-  <script src="js/entrada/gestos.js?v=1.5.0"></script>
-  <script src="js/entrada/puntero.js?v=1.5.0"></script>
-  <script src="js/render/render-pantalla.js?v=1.5.0"></script>
-  <script src="js/render/render-3d.js?v=1.5.0"></script>
-  <script src="js/ar/ar.js?v=1.5.0"></script>
-  <script src="js/red/red.js?v=1.5.0"></script>
-  <script src="js/tutorial/tutorial.js?v=1.5.0"></script>
-  <script src="js/app.js?v=1.5.0"></script>
+  <script src="js/config.js?v=1.5.2"></script>
+  <script src="js/utilidades.js?v=1.5.2"></script>
+  <script src="js/audio/sonidos.js?v=1.5.2"></script>
+  <script src="js/juego/fisica.js?v=1.5.2"></script>
+  <script src="js/juego/cpu.js?v=1.5.2"></script>
+  <script src="js/entrada/camara.js?v=1.5.2"></script>
+  <script src="js/entrada/hand-tracker.js?v=1.5.2"></script>
+  <script src="js/entrada/gestos.js?v=1.5.2"></script>
+  <script src="js/entrada/puntero.js?v=1.5.2"></script>
+  <script src="js/render/render-pantalla.js?v=1.5.2"></script>
+  <script src="js/red/red.js?v=1.5.2"></script>
+  <script src="js/tutorial/tutorial.js?v=1.5.2"></script>
+  <script src="js/app.js?v=1.5.2"></script>
 </body>
 </html>

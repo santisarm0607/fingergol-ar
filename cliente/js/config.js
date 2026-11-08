@@ -21,23 +21,6 @@ FG.config = {
   MODELO_MANO:
     'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
 
-  // --- Mesa 3D en realidad aumentada (A-Frame + AR.js, marcador Hiro) ---
-  AFRAME_URLS: [
-    'https://aframe.io/releases/1.6.0/aframe.min.js',
-    'https://cdn.jsdelivr.net/gh/aframevr/aframe@1.6.0/dist/aframe-master.min.js'
-  ],
-  ARJS_URLS: [
-    'https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js',
-    'https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@master/aframe/build/aframe-ar.js'
-  ],
-  // Imagen del marcador Hiro para imprimir o mostrar en otra pantalla (si una falla, la otra)
-  MARCADOR_HIRO: [
-    'https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/hiro.png',
-    'https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@master/data/images/hiro.png'
-  ],
-  // Tamaño de la mesa respecto al marcador: 0.02 → la mesa mide 3.2 x 2 marcadores
-  // (con un marcador de 10 cm, la mesa virtual mide 32 x 20 cm).
-  ESCALA_AR: 0.02,
 
   // --- Servidor en línea ------------------------------------
   // null = usa el mismo servidor que entrega la página (lo normal).

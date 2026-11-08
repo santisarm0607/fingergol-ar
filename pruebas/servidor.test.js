@@ -32,6 +32,21 @@ async function salaConDos() {
   return { a, b, codigo: sala.codigo, llaveA: sala.llave, llaveB: unido.llave };
 }
 
+test('/salud responde que el servidor está corriendo (para mostrar "En línea")', async () => {
+  const http = require('http');
+  const datos = await new Promise((resolver, rechazar) => {
+    http
+      .get(`http://127.0.0.1:${PUERTO}/salud`, (res) => {
+        let cuerpo = '';
+        res.on('data', (d) => (cuerpo += d));
+        res.on('end', () => resolver({ cuerpo, cors: res.headers['access-control-allow-origin'] }));
+      })
+      .on('error', rechazar);
+  });
+  assert.strictEqual(JSON.parse(datos.cuerpo).ok, true);
+  assert.strictEqual(datos.cors, '*');
+});
+
 test('responde al ping', async () => {
   const a = await ClienteWS.conectar(PUERTO);
   a.enviar({ t: 'ping' });
