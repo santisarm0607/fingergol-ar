@@ -10,13 +10,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Monoton&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/estilos.css?v=1.3.1">
+  <link rel="stylesheet" href="css/estilos.css?v=1.5.0">
 </head>
 <body>
 
-  <!-- ================= ESCENARIO (cámara + cancha) ================= -->
+  <!-- ================= ESCENARIO (cámara + mesa) ================= -->
   <div id="escenario">
     <video id="video" playsinline muted autoplay></video>
+    <div id="contenedor-ar"></div>
     <canvas id="lienzo"></canvas>
   </div>
 
@@ -41,6 +42,11 @@
   </div>
   <div id="mensaje-central" class="oculto" aria-live="assertive"></div>
   <div id="aviso" class="oculto" role="status"></div>
+  <!-- en línea: se cortó la conexión de alguien -->
+  <div id="aviso-red" class="oculto" role="status" aria-live="polite">
+    <div class="spinner chico" aria-hidden="true"></div>
+    <div><b id="aviso-red-titulo">Se cortó la conexión</b><span id="aviso-red-texto">Reconectando…</span></div>
+  </div>
   <div id="banner-demo" class="oculto">
     Vista previa en Claude: aquí se juega con <b>mouse, táctil o teclado</b>.
     Para jugar con las <b>manos</b> ejecuta el proyecto (mira el README).
@@ -54,10 +60,15 @@
         <p class="lema">Air hockey de fútbol: tu dedo índice frente a la cámara es el mazo.</p>
       </header>
 
+      <button class="btn-tutorial" id="btn-ver-tutorial">
+        <span class="play" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5l11 7-11 7z"/></svg></span>
+        <span class="txt"><b>Mira cómo se juega</b><small>Video corto de 20 segundos</small></span>
+      </button>
+
       <div class="modos">
         <button class="modo modo-cpu" data-modo="cpu">
           <span class="boton-arcade" aria-hidden="true"></span>
-          <span class="txt"><span class="tit">Contra la máquina</span><span class="sub">Juegas solo</span></span>
+          <span class="txt"><span class="tit">Contra la máquina</span><span class="sub" id="sub-cpu">Juegas solo</span></span>
         </button>
         <button class="modo modo-local" data-modo="local">
           <span class="boton-arcade" aria-hidden="true"></span>
@@ -68,6 +79,11 @@
           <span class="txt"><span class="tit">En línea</span><span class="sub" id="sub-online">Con un amigo en otro dispositivo</span></span>
         </button>
       </div>
+
+      <button class="btn-ar" id="btn-ar">
+        <span class="cubo" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg></span>
+        <span class="txt"><b>Mesa 3D sobre tu mesa</b><small id="sub-ar">Realidad aumentada con un marcador impreso</small></span>
+      </button>
 
       <ol class="como-jugar" aria-label="Cómo se juega">
         <li>Muestra tu dedo índice a la cámara.</li>
@@ -100,10 +116,68 @@
             <button data-valor="dificil">Difícil</button>
           </div>
         </div>
+        <div class="fila">
+          <span class="etq">Movimiento</span>
+          <div class="segmentos" data-ajuste="movimiento">
+            <button data-valor="normal">Normal</button>
+            <button data-valor="reducido">Reducido</button>
+          </div>
+        </div>
+        <p class="nota">"Reducido" quita el temblor, los destellos y las animaciones (por si te mareas).</p>
         <p class="nota">Sin cámara: el jugador 1 usa <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> y el jugador 2 las <kbd>flechas</kbd>, o toquen la pantalla con un dedo cada uno.</p>
       </details>
 
-      <footer class="pie">Hecho por <b>SantiSarm</b>, versión 1.3</footer>
+      <footer class="pie">Hecho por <b>SantiSarm</b>, versión 1.5</footer>
+    </div>
+  </section>
+
+  <!-- ================= TUTORIAL ("mini video") ================= -->
+  <section id="p-tutorial" class="pantalla modal">
+    <div class="tarjeta tutorial">
+      <div class="tut-cabeza">
+        <span class="tut-etq" id="tut-paso">Paso 1 de 4</span>
+        <button class="btn-link tut-saltar" id="tut-saltar">Saltar</button>
+      </div>
+      <div class="tut-video" id="tut-video">
+        <canvas id="tut-lienzo" aria-label="Animación que muestra cómo se juega"></canvas>
+        <button class="tut-play" id="tut-play" aria-label="Pausar"></button>
+        <div class="tut-barra"><i id="tut-progreso"></i></div>
+      </div>
+      <div class="tut-texto">
+        <h2 id="tut-titulo"></h2>
+        <p id="tut-desc"></p>
+        <p class="tut-extra oculto" id="tut-extra"></p>
+      </div>
+      <div class="tut-pie">
+        <button class="btn sec tut-atras" id="tut-atras" aria-label="Paso anterior"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <div class="tut-puntos" id="tut-puntos"></div>
+        <button class="btn" id="tut-sig">Siguiente</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= MESA 3D (AR.js) ================= -->
+  <section id="p-ar" class="pantalla">
+    <div class="tarjeta ar-prep">
+      <button class="btn-volver" data-volver>← Volver</button>
+      <h2>Mesa 3D sobre tu mesa</h2>
+      <p class="sub-tarjeta">La mesa de air hockey aparece encima de un marcador. Juegas con el dedo índice sobre tu mesa de verdad.</p>
+      <div class="ar-cuerpo">
+        <figure class="marcador">
+          <img id="img-marcador" alt="Marcador Hiro: un cuadrado negro con la palabra Hiro" width="150" height="150">
+          <div class="marcador-falla oculto" id="marcador-falla"><span>Sin internet. Busca <b>marcador Hiro</b> en Google.</span></div>
+          <figcaption><a id="link-marcador" target="_blank" rel="noopener">Abrir el marcador para imprimir</a></figcaption>
+        </figure>
+        <ol class="ar-pasos">
+          <li><b>Imprime el marcador</b> (unos 10 cm) o ábrelo en otro celular, y ponlo plano en el centro de la mesa.</li>
+          <li><b>Apoya el celular o el portátil quieto</b>, con la cámara viendo la mesa desde arriba y un poco de lado.</li>
+          <li><b>Juega con el dedo índice</b> tocando la mesa. Si tapas el marcador con la mano, la mesa se queda en su lugar.</li>
+        </ol>
+      </div>
+      <div class="botones">
+        <button class="btn grande" data-ar-modo="cpu">Contra la máquina</button>
+        <button class="btn sec grande" data-ar-modo="local">2 jugadores</button>
+      </div>
     </div>
   </section>
 
@@ -138,6 +212,7 @@
       <h2 id="carga-titulo">Preparando…</h2>
       <ul class="pasos oculto">
         <li id="paso-camara"><span class="ic"></span><span><b>Encender la cámara</b><small>Pulsa “Permitir” si el navegador lo pregunta</small></span></li>
+        <li id="paso-ar" class="oculto"><span class="ic"></span><span><b>Preparar la realidad aumentada</b><small>Descarga AR.js (solo la primera vez)</small></span></li>
         <li id="paso-modelo"><span class="ic"></span><span><b>Cargar el detector de manos</b><small>La primera vez tarda unos segundos</small></span></li>
       </ul>
       <div id="carga-error" class="oculto">
@@ -169,8 +244,9 @@
     </div>
     <div class="lobby-centro">
       <h2 id="lobby-titulo">Muestra tu mano</h2>
-      <p id="lobby-sub">Apunta con el dedo índice. Tu ficha seguirá a tu dedo.</p>
-      <p class="lobby-tip">Con buena luz y la mano a 40–70 cm de la cámara.</p>
+      <p id="lobby-sub">Apunta con el dedo índice. Tu mazo seguirá a tu dedo.</p>
+      <p class="lobby-tip" id="lobby-tip">Con buena luz y la mano a 40–70 cm de la cámara.</p>
+      <p class="lobby-gesto" id="lobby-gesto">Para pausar sin tocar la pantalla: abre toda la mano y déjala quieta un segundo.</p>
       <button id="btn-empezar-ya" class="btn sec">Empezar ya</button>
     </div>
   </section>
@@ -181,6 +257,8 @@
       <h2>Pausa</h2>
       <div class="botones col">
         <button id="btn-continuar" class="btn grande">Continuar</button>
+        <p class="pista-gesto" id="pista-pausa"><span class="gesto-barra"><i></i></span>Con la mano: pulgar arriba para continuar</p>
+        <button id="btn-pausa-tutorial" class="btn sec">Cómo se juega</button>
         <button id="btn-reiniciar" class="btn sec">Reiniciar partido</button>
         <button class="btn sec" data-menu>Volver al menú</button>
       </div>
@@ -206,8 +284,10 @@
       <h2 id="fin-titulo">¡Ganó Jugador 1!</h2>
       <div class="fin-marcador"><span class="c0" id="fin-g0">5</span><span>-</span><span class="c1" id="fin-g1">3</span></div>
       <p class="sub-tarjeta" id="fin-sub"></p>
+      <p class="fin-record oculto" id="fin-record"></p>
       <div class="botones col">
         <button id="btn-revancha" class="btn grande">Revancha</button>
+        <p class="pista-gesto" id="pista-fin"><span class="gesto-barra"><i></i></span>Con la mano: pulgar arriba para la revancha</p>
         <button class="btn sec" data-menu>Volver al menú</button>
       </div>
     </div>
@@ -225,16 +305,20 @@
   </section>
 
   <!-- Scripts en orden: configuración → utilidades → módulos → app -->
-  <script src="js/config.js?v=1.3.1"></script>
-  <script src="js/utilidades.js?v=1.3.1"></script>
-  <script src="js/audio/sonidos.js?v=1.3.1"></script>
-  <script src="js/juego/fisica.js?v=1.3.1"></script>
-  <script src="js/juego/cpu.js?v=1.3.1"></script>
-  <script src="js/entrada/camara.js?v=1.3.1"></script>
-  <script src="js/entrada/hand-tracker.js?v=1.3.1"></script>
-  <script src="js/entrada/puntero.js?v=1.3.1"></script>
-  <script src="js/render/render-pantalla.js?v=1.3.1"></script>
-  <script src="js/red/red.js?v=1.3.1"></script>
-  <script src="js/app.js?v=1.3.1"></script>
+  <script src="js/config.js?v=1.5.0"></script>
+  <script src="js/utilidades.js?v=1.5.0"></script>
+  <script src="js/audio/sonidos.js?v=1.5.0"></script>
+  <script src="js/juego/fisica.js?v=1.5.0"></script>
+  <script src="js/juego/cpu.js?v=1.5.0"></script>
+  <script src="js/entrada/camara.js?v=1.5.0"></script>
+  <script src="js/entrada/hand-tracker.js?v=1.5.0"></script>
+  <script src="js/entrada/gestos.js?v=1.5.0"></script>
+  <script src="js/entrada/puntero.js?v=1.5.0"></script>
+  <script src="js/render/render-pantalla.js?v=1.5.0"></script>
+  <script src="js/render/render-3d.js?v=1.5.0"></script>
+  <script src="js/ar/ar.js?v=1.5.0"></script>
+  <script src="js/red/red.js?v=1.5.0"></script>
+  <script src="js/tutorial/tutorial.js?v=1.5.0"></script>
+  <script src="js/app.js?v=1.5.0"></script>
 </body>
 </html>

@@ -1,8 +1,11 @@
 /* ============================================================
    App principal: une todo.
    menú → (cámara + detector) → "muestra tu mano" → partido → fin
-   Cada cuadro: leer manos/toques → asignar a jugadores →
+   Cada cuadro: leer manos/toques → gestos → asignar a jugadores →
    física (o red) → sonidos/efectos → dibujar.
+   Dos formas de ver el juego:
+   - Pantalla: la mesa 2D encima de tu cámara (render-pantalla.js)
+   - Mesa 3D:  la mesa sobre un marcador en tu mesa real (ar.js + render-3d.js)
    ============================================================ */
 (function () {
   const FG = window.FG;
@@ -21,6 +24,7 @@
     'sin-camara': 'No encontramos ninguna cámara conectada a este dispositivo.',
     ocupada: 'Otra app está usando la cámara (Zoom, Meet, otra pestaña…). Ciérrala y pulsa <b>Reintentar</b>.',
     mediapipe: 'No se pudo descargar el detector de manos (MediaPipe). Revisa tu conexión a internet.',
+    arjs: 'No se pudo descargar la realidad aumentada (AR.js). Revisa tu conexión a internet y pulsa <b>Reintentar</b>.',
     modelo: 'No se pudo iniciar el detector de manos en este dispositivo.',
     desconocido: 'Algo falló al encender la cámara.'
   };
@@ -28,6 +32,8 @@
   // Íconos dibujados con SVG (trazo neón, sin emojis)
   const svg = (d, extra = '') =>
     `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"${extra}>${d}</svg>`;
+  const NIVELES = { facil: 'Fácil', normal: 'Normal', dificil: 'Difícil' };
+
   const ICONOS = {
     pausa: svg('<path d="M8 5v14M16 5v14"/>'),
     cerrar: svg('<path d="M6 6l12 12M18 6L6 18"/>'),
@@ -40,9 +46,11 @@
     ajustes: {
       control: U.leer('control', 'manos'),
       goles: U.leer('goles', C.GOLES_POR_DEFECTO),
-      dificultad: U.leer('dificultad', 'normal')
+      dificultad: U.leer('dificultad', 'normal'),
+      // por defecto, lo que pida el sistema (accesibilidad: "reducir movimiento")
+      movimiento: U.leer('movimiento', U.sistemaPideMenosMovimiento() ? 'reducido' : 'normal')
     },
-    fase: 'menu', // menu | carga | lobby | juego | pausa | fin | alerta
+    fase: 'menu', // menu | tutorial | carga | lobby | juego | pausa | fin | alerta
     modo: null,   // local | cpu | online
     rol: null,    // anfitrion | invitado (solo en línea)
     partido: null,
@@ -55,16 +63,24 @@
     eventosRed: [],
     eventosRecibidos: [],
     manosDibujo: [],
+    manosCrudas: [],
+    vistaAR: false,   // true = mesa 3D sobre el marcador
+    ahorro: false,    // modo ahorro (se activa solo si el juego va lento)
+    pausaRed: null,   // en línea: { quien, hasta } mientras alguien reconecta
 
     /* ====================== ARRANQUE ====================== */
     iniciar() {
       this.video = $('#video');
       this.lienzo = $('#lienzo');
-      this.renderer = new FG.RenderPantalla(this.lienzo, this.video);
+      this.render2D = new FG.RenderPantalla(this.lienzo, this.video);
+      this.render3D = null; // se crea al entrar a la mesa 3D
+      this.renderer = this.render2D;
       this.puntero = new FG.Puntero(this.lienzo);
       this.puntero.rotado = () => this.renderer.rotado;
       this.sonidos = new FG.Sonidos();
       this.tracker = new FG.HandTracker();
+      this.tutorial = new FG.Tutorial(this);
+      this.gestos = new FG.Gestos.DetectorGestos({ palma: C.GESTO_PAUSA_SEG, pulgar: C.GESTO_PULGAR_SEG });
       this.videoActivo = this.video;
 
       if (C.MODO_DEMO) {
@@ -72,7 +88,10 @@
         $('#banner-demo').classList.remove('oculto');
         document.body.classList.add('demo');
         $('[data-ajuste="control"] [data-valor="manos"]').disabled = true;
+        $('#btn-ar').classList.add('deshabilitado');
+        $('#sub-ar').textContent = 'Necesita cámara: ejecuta el proyecto (mira el README)';
       }
+      this.registrarServiceWorker();
       // En GitHub Pages (o en la vista previa) no corre el servidor de Node: sin modo en línea
       this.sinServidor = C.MODO_DEMO || /github\.io$/.test(location.hostname) || location.protocol === 'file:';
       if (this.sinServidor) {
@@ -83,12 +102,21 @@
 
       this.conectarUI();
       this.refrescarAjustes();
+      this.actualizarRecords();
       this._bucle = (t) => this.bucle(t);
       requestAnimationFrame(this._bucle);
     },
 
     conectarUI() {
       $$('.modo').forEach((b) => b.addEventListener('click', () => this.elegirModo(b.dataset.modo)));
+      $('#btn-ar').addEventListener('click', () => this.abrirAR());
+      $$('[data-ar-modo]').forEach((b) =>
+        b.addEventListener('click', () => {
+          this.sonidos.activar();
+          this.sonidos.boton();
+          this.prepararPartida(b.dataset.arModo, null, { ar: true });
+        })
+      );
 
       $$('.segmentos').forEach((seg) => {
         seg.addEventListener('click', (ev) => {
@@ -114,7 +142,26 @@
         this.ajustes.control = 'tactil';
         U.guardar('control', 'tactil');
         this.refrescarAjustes();
+        if (this.ultimaPrep) this.ultimaPrep.opciones = {}; // sin cámara no hay mesa 3D
+        document.body.classList.remove('modo-ar');
         this.reintentar();
+      });
+
+      // tutorial animado: desde el inicio y desde la pausa
+      $('#btn-ver-tutorial').addEventListener('click', async () => {
+        this.sonidos.activar();
+        this.sonidos.boton();
+        this.fase = 'tutorial';
+        // en la vista previa de Claude se muestra el video del juego real (con la cámara)
+        await this.tutorial.abrir(C.MODO_DEMO ? 'manos' : this.varianteTutorial(), { final: 'Entendido' });
+        if (this.fase === 'tutorial') {
+          this.fase = 'menu';
+          this.mostrar('p-inicio');
+        }
+      });
+      $('#btn-pausa-tutorial').addEventListener('click', async () => {
+        const completo = await this.tutorial.abrir(this.varianteTutorial(), { final: 'Volver al partido' });
+        if (completo && this.fase === 'pausa') this.mostrar('p-pausa');
       });
 
       // lobby
@@ -184,6 +231,31 @@
       });
       const conManos = this.ajustes.control === 'manos';
       $('#resumen-ajustes').textContent = (conManos ? 'Con la mano' : 'Con mouse') + ', a ' + this.ajustes.goles + ' goles';
+      this.aplicarMovimiento();
+      this.actualizarRecords();
+    },
+
+    /** "Movimiento: Reducido": sin temblor, destellos ni animaciones. */
+    aplicarMovimiento() {
+      const menos = this.ajustes.movimiento === 'reducido';
+      document.body.classList.toggle('menos-movimiento', menos);
+      this.render2D.menosMovimiento = menos;
+      if (this.render3D) this.render3D.menosMovimiento = menos;
+    },
+
+    /** Guarda la página para abrirla sin internet (solo web: no instala nada). */
+    registrarServiceWorker() {
+      if (C.MODO_DEMO || !('serviceWorker' in navigator) || !window.isSecureContext) return;
+      if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch((e) => console.warn('[FingerGol] sin modo offline', e));
+      });
+    },
+
+    /** Tutorial con cámara ('manos') o con mouse/táctil ('tactil'), según cómo se va a jugar. */
+    varianteTutorial() {
+      const control = this.partido && this.controlActual ? this.controlActual : C.MODO_DEMO ? 'tactil' : this.ajustes.control;
+      return control === 'manos' ? 'manos' : 'tactil';
     },
 
     /* ====================== PANTALLAS ====================== */
@@ -232,11 +304,47 @@
       this.prepararPartida(modo);
     },
 
-    async prepararPartida(modo, rol = null) {
-      this.ultimaPrep = { modo, rol };
+    /** Pantalla de la mesa 3D: marcador para imprimir y pasos. */
+    abrirAR() {
+      this.sonidos.activar();
+      this.sonidos.boton();
+      if (C.MODO_DEMO) {
+        this.aviso('La mesa 3D necesita la cámara: ejecuta el proyecto con <b>npm start</b> (mira el README).', 4500);
+        return;
+      }
+      const img = $('#img-marcador');
+      if (!img.dataset.cargada) {
+        img.dataset.cargada = '1';
+        img.classList.remove('oculto');
+        $('#marcador-falla').classList.add('oculto');
+        $('#link-marcador').classList.remove('oculto');
+        const urls = C.MARCADOR_HIRO;
+        let i = 0;
+        img.onerror = () => {
+          i++;
+          if (i < urls.length) {
+            img.src = urls[i];
+            $('#link-marcador').href = urls[i];
+          } else {
+            // sin internet: un aviso del mismo tamaño que la imagen
+            img.classList.add('oculto');
+            $('#marcador-falla').classList.remove('oculto');
+            $('#link-marcador').classList.add('oculto');
+            img.dataset.cargada = ''; // se vuelve a intentar la próxima vez
+          }
+        };
+        img.src = urls[0];
+        $('#link-marcador').href = urls[0];
+      }
+      this.mostrar('p-ar');
+    },
+
+    async prepararPartida(modo, rol = null, opciones = {}) {
+      this.ultimaPrep = { modo, rol, opciones };
       const token = ++this.tokenPrep;
       this.modo = modo;
       this.rol = rol;
+      this.vistaAR = !!opciones.ar;
       this.humanos = modo === 'local' ? [0, 1] : modo === 'cpu' ? [0] : rol === 'anfitrion' ? [0] : [1];
       this.partido = new FG.Partido({ golesParaGanar: this.ajustes.goles });
       this.cpu = modo === 'cpu' ? new FG.CPU(this.partido, 1, this.ajustes.dificultad) : null;
@@ -249,11 +357,31 @@
       this.entradaRival = null;
       this.eventosRed = [];
       this.eventosRecibidos = [];
-      this.controlActual = C.MODO_DEMO ? 'tactil' : this.ajustes.control;
+      this.pausaGolpe = 0;
+      this.camaraLenta = 0;
+      this.pausaRed = null;
+      this.controlActual = this.vistaAR ? 'manos' : C.MODO_DEMO ? 'tactil' : this.ajustes.control;
       this.puntero.reiniciar();
+      this.gestos.reiniciar();
+
+      // la primera vez: mini video de cómo se juega (con cámara o con mouse/táctil)
+      // (la mesa 3D tiene su propia pantalla de pasos)
+      const variante = this.controlActual === 'manos' ? 'manos' : 'tactil';
+      const clave = variante === 'manos' ? 'tutorialManos' : 'tutorialTactil';
+      if (!this.vistaAR && !U.leer(clave, false)) {
+        this.fase = 'tutorial';
+        const completo = await this.tutorial.abrir(variante, {
+          final: variante === 'manos' ? 'Listo, encender la cámara' : '¡A jugar!'
+        });
+        if (!completo || token !== this.tokenPrep) return;
+        U.guardar(clave, true);
+      }
       this.fase = 'carga';
 
-      if (this.controlActual === 'manos') {
+      if (this.vistaAR) {
+        const ok = await this.prepararAR(token);
+        if (!ok || token !== this.tokenPrep) return;
+      } else if (this.controlActual === 'manos') {
         const ok = await this.prepararCamara(token);
         if (!ok || token !== this.tokenPrep) return;
       }
@@ -262,16 +390,71 @@
 
     reintentar() {
       if (!this.ultimaPrep) return this.irAlMenu();
-      this.prepararPartida(this.ultimaPrep.modo, this.ultimaPrep.rol);
+      this.prepararPartida(this.ultimaPrep.modo, this.ultimaPrep.rol, this.ultimaPrep.opciones);
+    },
+
+    /** Pantalla de carga: marca cada paso como activo, hecho o con error. */
+    pantallaCarga(conAR) {
+      this.mostrar('p-carga');
+      const pasos = { camara: $('#paso-camara'), ar: $('#paso-ar'), modelo: $('#paso-modelo') };
+      Object.values(pasos).forEach((p) => (p.dataset.estado = ''));
+      pasos.ar.classList.toggle('oculto', !conAR);
+      $('#carga-error').classList.add('oculto');
+      $('#carga-spinner').classList.remove('oculto');
+      $('#carga-titulo').textContent = conAR ? 'Preparando la mesa 3D…' : 'Preparando…';
+      return pasos;
+    },
+
+    errorCarga(e, paso) {
+      if (paso) paso.dataset.estado = 'fallo';
+      $('#carga-spinner').classList.add('oculto');
+      $('#carga-titulo').textContent = 'No pudimos empezar';
+      $('#carga-error-texto').innerHTML = MENSAJES_ERROR[e.codigo] || MENSAJES_ERROR.desconocido;
+      $('#carga-error').classList.remove('oculto');
+    },
+
+    /** Mesa 3D: AR.js abre la cámara y sigue el marcador; MediaPipe usa ese mismo video. */
+    async prepararAR(token) {
+      const pasos = this.pantallaCarga(true);
+      let paso = null;
+      const marcar = (p, estado) => {
+        p.dataset.estado = estado;
+        if (estado === 'activo') paso = p;
+      };
+      try {
+        // si la cámara de la pantalla normal estaba abierta, se cierra: AR.js abre la suya
+        FG.Camara.detener();
+        this.video.srcObject = null;
+        if (!this.ar) this.ar = new FG.RenderAR($('#contenedor-ar'));
+        marcar(pasos.camara, 'activo');
+        if (!this.ar.video) await this.ar.verificarCamara();
+        marcar(pasos.camara, 'hecho');
+        if (token !== this.tokenPrep) return false;
+
+        marcar(pasos.ar, 'activo');
+        await this.ar.cargarLibrerias();
+        document.body.classList.add('modo-ar');
+        if (!this.ar.video) await this.ar.crearEscena();
+        this.camAR = FG.CamaraAR.desdeAR(this.ar);
+        this.videoActivo = this.ar.video;
+        marcar(pasos.ar, 'hecho');
+        if (token !== this.tokenPrep) return false;
+
+        marcar(pasos.modelo, 'activo');
+        await this.tracker.cargar(2);
+        if (token !== this.tokenPrep) return false;
+        marcar(pasos.modelo, 'hecho');
+        return true;
+      } catch (e) {
+        console.error('[FingerGol] error al preparar la mesa 3D', e);
+        if (token !== this.tokenPrep) return false;
+        this.errorCarga(e, paso);
+        return false;
+      }
     },
 
     async prepararCamara(token) {
-      this.mostrar('p-carga');
-      const pasos = { camara: $('#paso-camara'), modelo: $('#paso-modelo') };
-      Object.values(pasos).forEach((p) => (p.dataset.estado = ''));
-      $('#carga-error').classList.add('oculto');
-      $('#carga-spinner').classList.remove('oculto');
-      $('#carga-titulo').textContent = 'Preparando…';
+      const pasos = this.pantallaCarga(false);
       let paso = null;
       const marcar = (p, estado) => {
         p.dataset.estado = estado;
@@ -294,33 +477,46 @@
       } catch (e) {
         console.error('[FingerGol] error al preparar la cámara', e);
         if (token !== this.tokenPrep) return false;
-        if (paso) paso.dataset.estado = 'fallo';
-        $('#carga-spinner').classList.add('oculto');
-        $('#carga-titulo').textContent = 'No pudimos empezar';
-        $('#carga-error-texto').innerHTML = MENSAJES_ERROR[e.codigo] || MENSAJES_ERROR.desconocido;
-        $('#carga-error').classList.remove('oculto');
+        this.errorCarga(e, paso);
         return false;
       }
     },
 
     entrarEscenario() {
       this.mostrar(null);
-      const conCamaraPantalla = this.controlActual === 'manos';
+      const conManos = this.controlActual === 'manos';
+      const conCamaraPantalla = conManos && !this.vistaAR;
       document.body.classList.add('en-juego');
       document.body.classList.toggle('con-camara', conCamaraPantalla);
-      this.renderer.conCamara = conCamaraPantalla;
+      document.body.classList.toggle('con-manos', conManos);
+
+      if (this.vistaAR) {
+        if (!this.render3D) this.render3D = new FG.Render3D(this.lienzo);
+        this.render3D.ahorro = this.ahorro;
+        this.render3D.usarCamara(this.camAR);
+        this.renderer = this.render3D;
+        this.aplicarMovimiento();
+      } else {
+        this.renderer = this.render2D;
+        this.render2D.conCamara = conCamaraPantalla;
+        // zona cómoda: el video se ve más grande, así el centro de la cámara cubre toda la mesa
+        const zoom = conCamaraPantalla ? 1 / Math.min(1, Math.max(0.5, C.ZONA_MANO || 1)) : 1;
+        this.render2D.zoomVideo = zoom;
+        this.video.style.transform = zoom > 1 ? `scaleX(-1) scale(${zoom.toFixed(3)})` : '';
+      }
       $('#hud').classList.remove('oculto');
       $('#btn-pausa').innerHTML = this.modo === 'online' ? ICONOS.cerrar : ICONOS.pausa;
       this.actualizarNombres();
       this.actualizarMarcador();
       this.pedirWakeLock();
 
-      if (this.controlActual === 'manos' || this.modo === 'online') this.abrirLobby();
+      if (conManos || this.modo === 'online') this.abrirLobby();
       else this.empezarPartido();
     },
 
     abrirLobby() {
       this.fase = 'lobby';
+      this._buscandoMarcador = undefined;
       const lobby = $('#p-lobby');
       lobby.classList.add('activa');
       lobby.classList.toggle('sin-lados', this.controlActual !== 'manos');
@@ -329,21 +525,45 @@
         $(`#lado${lado}-nombre`).textContent = nombres[lado];
         $(`#lado${lado}`).classList.toggle('remoto', !this.humanos.includes(lado));
       });
+      this.textosLobby();
+      $('#lobby-tip').textContent = this.vistaAR
+        ? 'El celular o el portátil quieto, viendo la mesa desde arriba.'
+        : 'Con buena luz y la mano a 40–70 cm de la cámara.';
+      $('#btn-empezar-ya').classList.toggle('oculto', this.modo === 'online' && this.rol === 'invitado');
+      $('#lobby-gesto').classList.toggle('oculto', this.modo === 'online'); // en línea no hay pausa
+    },
+
+    /** Títulos del lobby (en la mesa 3D, primero hay que encontrar el marcador). */
+    textosLobby() {
+      const buscandoMarcador = this.vistaAR && !(this.camAR && this.camAR.visible());
+      if (buscandoMarcador === this._buscandoMarcador) return;
+      this._buscandoMarcador = buscandoMarcador;
+      $('#p-lobby').classList.toggle('sin-lados', this.controlActual !== 'manos' || buscandoMarcador);
+      if (buscandoMarcador) {
+        $('#lobby-titulo').textContent = 'Apunta la cámara al marcador';
+        $('#lobby-sub').textContent = 'Pon el marcador Hiro plano en el centro de tu mesa. La mesa 3D aparece encima.';
+        return;
+      }
       $('#lobby-titulo').textContent = this.controlActual === 'manos' ? 'Muestra tu mano' : 'Esperando a tu rival…';
       $('#lobby-sub').textContent =
         this.controlActual === 'manos'
           ? this.humanos.length === 2
-            ? 'Cada jugador apunta con el dedo índice en su lado.'
-            : 'Apunta con el dedo índice. Tu ficha seguirá a tu dedo.'
+            ? this.vistaAR
+              ? 'Cada jugador toca la mesa con el dedo índice en su lado.'
+              : 'Cada jugador apunta con el dedo índice en su lado.'
+            : this.vistaAR
+              ? 'Toca la mesa con el dedo índice. Tu mazo seguirá a tu dedo.'
+              : 'Apunta con el dedo índice. Tu mazo seguirá a tu dedo.'
           : 'El partido empieza cuando los dos estén listos.';
-      $('#btn-empezar-ya').classList.toggle('oculto', this.modo === 'online' && this.rol === 'invitado');
     },
 
     ocultarLobby() {
       $('#p-lobby').classList.remove('activa');
+      this._buscandoMarcador = undefined;
     },
 
     actualizarLobby(asig, dt) {
+      this.textosLobby();
       const manos = this.controlActual === 'manos';
       for (const lado of this.humanos) {
         if (!manos) this.listo[lado] = LISTO_SEG;
@@ -404,6 +624,8 @@
     },
 
     reiniciarPartido() {
+      this.pausaGolpe = 0;
+      this.camaraLenta = 0;
       if (this.cpu) this.cpu = new FG.CPU(this.partido, 1, this.ajustes.dificultad);
       this.partido.iniciar();
       this.fase = 'juego';
@@ -441,15 +663,70 @@
       } else if (this.modo === 'cpu') {
         titulo = mio ? '¡Le ganaste a la máquina!' : 'Ganó la máquina';
         sub = mio ? 'Prueba la dificultad “Difícil” en Ajustes.' : '¿La revancha?';
+        this.mostrarRecord(this.registrarResultado(mio));
       } else {
         titulo = mio ? '¡Ganaste!' : 'Ganó tu rival';
         sub = this.rol === 'invitado' ? 'La revancha la inicia quien creó la sala.' : '';
       }
+      if (this.modo !== 'cpu') $('#fin-record').classList.add('oculto');
       $('#fin-icono').innerHTML = this.modo === 'local' || mio ? ICONOS.copa : '';
       $('#fin-titulo').textContent = titulo;
       $('#fin-sub').textContent = sub;
       $('#fin-titulo').style.color = C.EQUIPOS[ganador].color;
       this.mostrar('p-fin');
+    },
+
+    /* ====================== RÉCORDS (contra la máquina) ====================== */
+    leerRecords() {
+      const r = U.leer('records', {});
+      for (const n of Object.keys(NIVELES)) {
+        r[n] = Object.assign({ victorias: 0, derrotas: 0, racha: 0, mejor: 0 }, r[n]);
+      }
+      return r;
+    },
+
+    /** Guarda el resultado de un partido terminado contra la máquina. */
+    registrarResultado(gano) {
+      const nivel = this.ajustes.dificultad;
+      const todos = this.leerRecords();
+      const r = todos[nivel];
+      const mejorAntes = r.mejor;
+      if (gano) {
+        r.victorias++;
+        r.racha++;
+        r.mejor = Math.max(r.mejor, r.racha);
+      } else {
+        r.derrotas++;
+        r.racha = 0;
+      }
+      U.guardar('records', todos);
+      this.actualizarRecords();
+      return { gano, nivel, racha: r.racha, mejor: r.mejor, nuevo: gano && r.mejor > mejorAntes && r.mejor > 1 };
+    },
+
+    mostrarRecord(res) {
+      const el = $('#fin-record');
+      const nivel = NIVELES[res.nivel];
+      let texto = '';
+      if (res.gano) {
+        texto = `Racha en ${nivel}: ${res.racha} ${res.racha === 1 ? 'victoria' : 'victorias seguidas'}`;
+        if (res.nuevo) texto += '. ¡Nuevo récord!';
+      } else if (res.mejor > 0) {
+        texto = `Tu mejor racha en ${nivel}: ${res.mejor} ${res.mejor === 1 ? 'victoria' : 'victorias seguidas'}`;
+      }
+      el.textContent = texto;
+      el.classList.toggle('oculto', !texto);
+    },
+
+    /** Texto del botón "Contra la máquina" en el inicio. */
+    actualizarRecords() {
+      const nivel = this.ajustes.dificultad;
+      const r = this.leerRecords()[nivel];
+      let sub = 'Juegas solo';
+      if (r.victorias > 0) {
+        sub += ` · ${NIVELES[nivel]}: ${r.victorias} ${r.victorias === 1 ? 'victoria' : 'victorias'}, mejor racha ${r.mejor}`;
+      }
+      $('#sub-cpu').textContent = sub;
     },
 
     pedirRevancha() {
@@ -465,12 +742,23 @@
 
     irAlMenu() {
       this.tokenPrep++;
+      if (this.tutorial.abierto) this.tutorial.cerrar(false);
       if (this.red) {
         this.red.cerrar();
         this.red = null;
       }
+      if (document.body.classList.contains('modo-ar')) {
+        location.reload(); // AR.js deja su cámara y su escena abiertas: recargar es lo más limpio
+        return;
+      }
+      this.ocultarAvisoRed(false);
       FG.Camara.detener();
       this.video.srcObject = null;
+      this.video.style.transform = '';
+      this.render2D.zoomVideo = 1;
+      this.vistaAR = false;
+      this.renderer = this.render2D;
+      this.gestos.reiniciar();
       this.partido = null;
       this.cpu = null;
       this.modo = null;
@@ -479,7 +767,7 @@
       this.ocultarLobby();
       $('#hud').classList.add('oculto');
       $('#mensaje-central').classList.add('oculto');
-      document.body.classList.remove('en-juego', 'con-camara');
+      document.body.classList.remove('en-juego', 'con-camara', 'con-manos');
       this.renderer.conCamara = false;
       this.soltarWakeLock();
       this.mostrar('p-inicio');
@@ -525,16 +813,19 @@
     leerEntradas(ahora, dt) {
       const lista = [];
       this.manosDibujo = [];
+      this.manosCrudas = [];
       if (this.controlActual === 'manos' && this.tracker.listo) {
-        const mapa = this.renderer;
-        const manos = this.tracker.detectar(this.videoActivo, ahora);
+        // modo ahorro: se busca la mano un cuadro sí y otro no
+        this._cuadro = (this._cuadro || 0) + 1;
+        const manos = this.ahorro && this._cuadro % 2 ? this.tracker.manos : this.tracker.detectar(this.videoActivo, ahora);
+        this.manosCrudas = manos;
         for (const m of manos) {
-          const puntos = m.puntos.map((p) => mapa.videoAPantalla(p.x, p.y));
+          const puntos = m.puntos.map((p) => this.videoAPantalla(p.x, p.y));
           const dib = { puntos, color: '#dfe6ff' };
           this.manosDibujo.push(dib);
-          const f = mapa.pantallaACancha(puntos[8][0], puntos[8][1]);
+          const f = this.pantallaAMesa(puntos[8][0], puntos[8][1]);
           if (!f) continue;
-          const fm = mapa.pantallaACancha(puntos[0][0], puntos[0][1]) || f;
+          const fm = this.pantallaAMesa(puntos[0][0], puntos[0][1]) || f;
           lista.push({ x: f[0], y: f[1], xLado: fm[0], mano: m, dib });
         }
       }
@@ -546,6 +837,90 @@
       }
       for (const k of this.puntero.teclado(dt, this.partido)) lista.push(k);
       return lista;
+    },
+
+    /** Punto del video (0..1) -> píxel de pantalla (en la mesa 3D el video no va en espejo). */
+    videoAPantalla(nx, ny) {
+      return this.vistaAR ? this.ar.videoAPantalla(nx, ny) : this.render2D.videoAPantalla(nx, ny);
+    },
+    /** Píxel de pantalla -> punto de la mesa (en la mesa 3D: donde el dedo toca tu mesa). */
+    pantallaAMesa(sx, sy) {
+      if (!this.vistaAR) return this.render2D.pantallaACancha(sx, sy);
+      return this.camAR && this.camAR.visible() ? this.camAR.pantallaAPlano(sx, sy) : null;
+    },
+
+    /* ====================== GESTOS ====================== */
+    /**
+     * Mano abierta (sostenida) = pausa · pulgar arriba = continuar o revancha.
+     * Solo cuando se juega con la cámara.
+     */
+    revisarGestos(dt) {
+      this.gestoVista = null;
+      let buscar = [];
+      if (this.controlActual === 'manos' && this.tracker.listo) {
+        if (this.fase === 'juego' && this.modo !== 'online' && !this.tutorial.abierto) buscar = ['palma'];
+        else if (this.fase === 'pausa' && $('#p-pausa').classList.contains('activa')) buscar = ['pulgar'];
+        else if (this.fase === 'fin' && $('#p-fin').classList.contains('activa')) buscar = ['pulgar'];
+      }
+      if (!buscar.length) {
+        this.gestos.reiniciar();
+        this.pintarPistasGesto(0);
+        return;
+      }
+      const v = this.videoActivo;
+      const aspecto = v && v.videoWidth ? v.videoWidth / v.videoHeight : 16 / 9;
+      const r = this.gestos.actualizar(this.manosCrudas, dt, buscar, aspecto);
+      this.pintarPistasGesto(r.gesto === 'pulgar' ? r.progreso : 0);
+      if (r.gesto === 'palma' && r.mano && !r.listo) {
+        // anillo que se llena en el centro de la palma
+        const centro = [0, 5, 9, 13, 17].reduce(
+          (a, i) => [a[0] + r.mano.puntos[i].x / 5, a[1] + r.mano.puntos[i].y / 5],
+          [0, 0]
+        );
+        this.gestoVista = { punto: this.videoAPantalla(centro[0], centro[1]), progreso: r.progreso, texto: 'Pausa' };
+      }
+      if (!r.listo) return;
+      this.sonidos.boton();
+      if (r.gesto === 'palma') this.pausar();
+      else if (this.fase === 'pausa') this.continuar();
+      else if (this.fase === 'fin') this.pedirRevancha();
+    },
+
+    pintarPistasGesto(progreso) {
+      if (progreso === this._pistaGesto) return;
+      this._pistaGesto = progreso;
+      $$('.pista-gesto .gesto-barra i').forEach((i) => (i.style.width = Math.round(progreso * 100) + '%'));
+    },
+
+    /* ====================== MODO AHORRO ====================== */
+    /** Si el juego va lento varios segundos seguidos, se apagan los brillos. */
+    medirRendimiento(segundos) {
+      if (this.ahorro || !(this.fase === 'juego' || this.fase === 'lobby') || document.hidden || segundos > 0.5) {
+        this.rend = null;
+        return;
+      }
+      const r = this.rend || (this.rend = { t: 0, n: 0, lentos: 0 });
+      r.t += segundos;
+      r.n++;
+      if (r.t < 1) return;
+      const fps = r.n / r.t;
+      r.lentos = fps < C.FPS_MINIMO ? r.lentos + 1 : 0;
+      r.t = 0;
+      r.n = 0;
+      if (r.lentos >= 3) this.activarAhorro();
+    },
+
+    activarAhorro() {
+      if (this.ahorro) return;
+      this.ahorro = true;
+      this.render2D.ahorro = true;
+      this.render2D.ajustar();
+      if (this.render3D) {
+        this.render3D.ahorro = true;
+        this.render3D.ajustar();
+      }
+      document.body.classList.add('ahorro');
+      this.aviso('Modo ahorro: quitamos brillos para que el juego vaya fluido.', 3500);
     },
 
     /** Decide qué mano/dedo controla a cada jugador. */
@@ -573,10 +948,20 @@
       };
       if (this.humanos.length === 2) {
         // dos jugadores: tu mano es tuya si tu muñeca está en tu mitad
+        const usadas = new Set();
         for (const lado of [0, 1]) {
           if (res[lado]) continue;
           const cand = libres.filter((e) => (e.xLado < W / 2) === (lado === 0));
           res[lado] = masCercana(cand, this.ultimaPos[lado]);
+          if (res[lado]) usadas.add(res[lado]);
+        }
+        // si a un lado le falta mano y sobra una (ej. alguien se estiró hasta la mitad),
+        // se decide por la punta del dedo
+        for (const lado of [0, 1]) {
+          if (res[lado]) continue;
+          const cand = libres.filter((e) => !usadas.has(e) && (e.x < W / 2) === (lado === 0));
+          res[lado] = masCercana(cand, this.ultimaPos[lado]);
+          if (res[lado]) usadas.add(res[lado]);
         }
       } else if (this.humanos.length === 1) {
         const lado = this.humanos[0];
@@ -605,15 +990,24 @@
     /* ====================== BUCLE ====================== */
     bucle(ahora) {
       requestAnimationFrame(this._bucle);
-      const dt = Math.min(0.05, Math.max(0, (ahora - (this.tPrev || ahora)) / 1000));
+      const crudo = Math.max(0, (ahora - (this.tPrev || ahora)) / 1000);
+      const dt = Math.min(0.05, crudo);
       this.tPrev = ahora;
 
-      if (!this.partido || this.fase === 'menu' || this.fase === 'carga') {
+      // mesa 3D: seguir el marcador y recalcular la cámara
+      if (this.ar && this.ar.ancla) {
+        this.ar.actualizar(dt);
+        if (this.camAR) this.camAR.preparar();
+      }
+
+      if (!this.partido || this.fase === 'menu' || this.fase === 'carga' || this.fase === 'tutorial') {
         this.bucleFondo(dt);
         return;
       }
+      this.medirRendimiento(crudo);
 
       const entradas = this.leerEntradas(ahora, dt);
+      this.revisarGestos(dt);
       const asig = this.asignar(entradas, ahora / 1000, dt);
       if (this.fase === 'lobby') this.actualizarLobby(asig, dt);
 
@@ -622,7 +1016,9 @@
         this.partido.fijarObjetivo(lado, a ? a.x : null, a ? a.y : null);
       }
 
-      const corre = this.fase === 'juego' || this.fase === 'lobby' || this.fase === 'fin';
+      // en línea, mientras alguien reconecta el partido se congela
+      const corre = (this.fase === 'juego' || this.fase === 'lobby' || this.fase === 'fin') && !this.pausaRed;
+      if (this.pausaRed) this.actualizarAvisoRed();
       const simulaAqui = this.modo !== 'online' || this.rol === 'anfitrion';
       // "game feel": el juego se congela un instante al pegar fuerte y va en cámara lenta en el gol
       let dtFisica = dt;
@@ -663,12 +1059,20 @@
         manos: this.manosDibujo,
         etiquetas: this._etiquetas,
         locales: this.humanos,
-        avisos: this.controlActual === 'manos' && (this.fase === 'juego' || this.fase === 'lobby')
+        avisos: this.controlActual === 'manos' && (this.fase === 'juego' || this.fase === 'lobby'),
+        rotulos: this.vistaAR && this.fase === 'lobby' ? this.nombresLargos() : null
       });
+      if (this.gestoVista) this.renderer.dibujarGesto(this.gestoVista);
     },
 
     /** En el menú se ve un partido de fondo entre dos máquinas. */
     bucleFondo(dt) {
+      if (document.body.classList.contains('modo-ar')) {
+        // en la mesa 3D (cargando) no hay partido de fondo: se ve la cámara
+        this.renderer.ctx.setTransform(1, 0, 0, 1, 0, 0);
+        this.renderer.ctx.clearRect(0, 0, this.lienzo.width, this.lienzo.height);
+        return;
+      }
       if (!this.fondo) {
         const p = new FG.Partido({ golesParaGanar: 999 });
         p.iniciar();
@@ -703,7 +1107,7 @@
               this.tChispa = ahora;
             }
             if (e.fuerza > 190 && ahora - (this.tFrase || 0) > 1500) {
-              const frases = ['¡Zapatazo!', '¡Bombazo!', '¡Cañonazo!', '¡Qué fuerza!'];
+              const frases = ['¡Cañonazo!', '¡Bombazo!', '¡Misil!', '¡Qué fuerza!'];
               this.renderer.textoFlotante(frases[(Math.random() * frases.length) | 0], e.x, e.y, C.EQUIPOS[e.lado].color);
               this.tFrase = ahora;
             }
@@ -713,7 +1117,7 @@
             break;
           case 'poste':
             this.sonidos.poste();
-            this.renderer.textoFlotante('¡Al palo!', e.x, e.y, '#ffffff');
+            this.renderer.textoFlotante('¡Rozó el arco!', e.x, e.y, '#ffffff');
             break;
           case 'cuenta':
             this.sonidos.cuenta(e.n);
@@ -807,8 +1211,15 @@
           this.errorOnline(m.msg || 'Error en la sala');
         }
       });
-      red.on('rival-salio', () => this.rivalSalio('Tu rival salió del partido.'));
-      red.on('desconectado', () => this.rivalSalio('Se perdió la conexión con el servidor.'));
+      red.on('rival-salio', (m) =>
+        this.rivalSalio(m && m.motivo === 'caida' ? 'Tu rival perdió la conexión y no volvió a tiempo.' : 'Tu rival salió del partido.')
+      );
+      red.on('desconectado', () => this.rivalSalio('Se perdió la conexión con el servidor y no se pudo volver.'));
+      // reconexión: el partido se congela hasta que la conexión vuelva
+      red.on('caida', (m) => this.mostrarAvisoRed('propia', m.hasta));
+      red.on('reconectado', () => this.ocultarAvisoRed(true));
+      red.on('rival-caido', (m) => this.mostrarAvisoRed('rival', Date.now() + (m.s || C.ESPERA_RECONEXION) * 1000));
+      red.on('rival-volvio', () => this.ocultarAvisoRed(true));
       red.on('in', (m) => {
         this.entradaRival = m.x == null ? null : { x: m.x, y: m.y };
         this.tEntradaRival = performance.now();
@@ -868,8 +1279,42 @@
       this.red.enviar({ t: 'unir', codigo });
     },
 
+    /** En línea: alguien perdió la conexión (quien = 'propia' | 'rival'). */
+    mostrarAvisoRed(quien, hasta) {
+      if (!this.modo) return;
+      this.pausaRed = { quien, hasta };
+      $('#aviso-red-titulo').textContent = quien === 'propia' ? 'Se cortó tu conexión' : 'Tu rival perdió la conexión';
+      $('#aviso-red').classList.remove('oculto');
+      this.actualizarAvisoRed();
+    },
+
+    actualizarAvisoRed() {
+      if (!this.pausaRed) return;
+      const seg = Math.max(0, Math.ceil((this.pausaRed.hasta - Date.now()) / 1000));
+      const texto = (this.pausaRed.quien === 'propia' ? 'Reconectando… ' : 'Esperando a que vuelva… ') + seg + ' s';
+      if (texto !== this._textoRed) {
+        this._textoRed = texto;
+        $('#aviso-red-texto').textContent = texto;
+      }
+    },
+
+    /** Volvió la conexión: el partido sigue con el mismo marcador (con un 3-2-1). */
+    ocultarAvisoRed(reanudar) {
+      const estaba = !!this.pausaRed;
+      this.pausaRed = null;
+      this._textoRed = null;
+      $('#aviso-red').classList.add('oculto');
+      if (!reanudar || !estaba || !this.partido) return;
+      if (this.modo === 'online' && this.rol === 'anfitrion') {
+        if (this.partido.estado === 'jugando') this.partido.cambiarEstado('cuenta');
+        this.tRed = 0; // mandar el estado de inmediato
+      }
+      this.aviso('Conexión recuperada');
+    },
+
     rivalSalio(texto) {
       if (this.fase === 'menu' || !this.modo) return;
+      this.ocultarAvisoRed(false);
       if (this.red) {
         this.red.cerrar();
         this.red = null;

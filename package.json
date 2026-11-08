@@ -1,12 +1,13 @@
 {
   "name": "fingergol-ar",
-  "version": "1.0.0",
-  "description": "Fútbol con los dedos en realidad aumentada (MediaPipe + AR.js). Multijugador local y en línea.",
+  "version": "1.5.0",
+  "description": "Air hockey con los dedos en realidad aumentada (MediaPipe + AR.js). Multijugador local y en línea.",
   "author": "SantiSarm",
   "license": "MIT",
   "private": true,
   "scripts": {
-    "start": "node servidor/servidor.js"
+    "start": "node servidor/servidor.js",
+    "test": "node --test pruebas/fisica.test.js pruebas/cpu.test.js pruebas/gestos.test.js pruebas/camara-ar.test.js pruebas/servidor.test.js"
   },
   "engines": {
     "node": ">=18"

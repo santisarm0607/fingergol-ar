@@ -7,6 +7,11 @@
 
    Uso:  node servidor/servidor.js      (o: npm start)
    Puerto: variable PORT (por defecto 3000)
+
+   Reconexión: si a un jugador se le cae la conexión, su puesto
+   en la sala se guarda unos segundos (ESPERA_RECONEXION). Con el
+   código de la sala y su "llave" secreta puede volver y el
+   partido sigue. Si sale a propósito ("salir"), la sala se cierra.
    ============================================================ */
 'use strict';
 
@@ -21,6 +26,7 @@ const CARPETA_CLIENTE = path.resolve(__dirname, '..', 'cliente');
 const GUID_WS = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 const MAX_MENSAJE = 64 * 1024;
 const LETRAS = 'ABCDEFGHJKMNPQRSTUVWXYZ'; // sin I, L, O para no confundir
+const ESPERA_RECONEXION = Number(process.env.ESPERA_RECONEXION) || 15; // segundos
 
 const TIPOS = {
   '.html': 'text/html; charset=utf-8',
@@ -91,6 +97,8 @@ class Conexion {
     this.alCerrar = () => {};
     socket.setNoDelay(true);
     socket.on('data', (d) => this.datos(d));
+    // 'end': el otro lado cortó (el servidor HTTP deja la conexión "medio abierta" si no)
+    socket.on('end', () => this.terminar());
     socket.on('close', () => this.terminar());
     socket.on('error', () => this.terminar());
   }
@@ -183,7 +191,8 @@ class Conexion {
 }
 
 /* ======================= SALAS ======================= */
-const salas = new Map(); // código -> { anfitrion, invitado }
+// código -> { anfitrion, invitado, llaves: { anfitrion, invitado }, esperas: { rol: temporizador } }
+const salas = new Map();
 
 function nuevoCodigo() {
   for (let intento = 0; intento < 1000; intento++) {
@@ -194,35 +203,74 @@ function nuevoCodigo() {
   throw new Error('Sin códigos libres');
 }
 
+const nuevaLlave = () => crypto.randomBytes(12).toString('hex');
+const otroRol = (rol) => (rol === 'anfitrion' ? 'invitado' : 'anfitrion');
+
 function rivalDe(con) {
   const s = con.sala && salas.get(con.sala);
   if (!s) return null;
-  return s.anfitrion === con ? s.invitado : s.anfitrion;
+  return s[otroRol(con.rol)];
 }
 
+/** Cierra la sala y avisa al que quede conectado (motivo: 'salio' | 'caida'). */
+function cerrarSala(codigo, motivo) {
+  const s = salas.get(codigo);
+  if (!s) return;
+  salas.delete(codigo);
+  Object.values(s.esperas).forEach((t) => clearTimeout(t));
+  for (const rol of ['anfitrion', 'invitado']) {
+    const con = s[rol];
+    if (!con) continue;
+    con.sala = null;
+    if (con.abierta && motivo) con.enviar({ t: 'rival-salio', motivo });
+  }
+  console.log(`[sala ${codigo}] cerrada (quedan ${salas.size})`);
+}
+
+/** Salir a propósito: la sala se cierra en el momento. */
 function salir(con) {
   const codigo = con.sala;
   if (!codigo) return;
   const s = salas.get(codigo);
   con.sala = null;
   if (!s) return;
-  const otro = s.anfitrion === con ? s.invitado : s.anfitrion;
-  salas.delete(codigo);
-  if (otro && otro.abierta) {
-    otro.sala = null;
-    otro.enviar({ t: 'rival-salio' });
-  }
-  console.log(`[sala ${codigo}] cerrada (quedan ${salas.size})`);
+  s[con.rol] = null;
+  cerrarSala(codigo, 'salio');
+}
+
+/** Se cayó la conexión (sin "salir"): guardamos su puesto un rato. */
+function caer(con) {
+  const codigo = con.sala;
+  if (!codigo) return;
+  const s = salas.get(codigo);
+  con.sala = null;
+  if (!s || s[con.rol] !== con) return;
+  const rol = con.rol;
+  s[rol] = null;
+  // (si nadie se había unido todavía, igual guardamos la sala por si vuelve el anfitrión)
+  const otro = s[otroRol(rol)];
+  if (otro && otro.abierta) otro.enviar({ t: 'rival-caido', s: ESPERA_RECONEXION });
+  clearTimeout(s.esperas[rol]);
+  s.esperas[rol] = setTimeout(() => {
+    delete s.esperas[rol];
+    if (salas.get(codigo) === s && !s[rol]) cerrarSala(codigo, 'caida');
+  }, ESPERA_RECONEXION * 1000);
+  console.log(`[sala ${codigo}] se cayó ${rol}, esperando ${ESPERA_RECONEXION} s`);
 }
 
 function alMensaje(con, m) {
   switch (m.t) {
+    case 'ping':
+      con.enviar({ t: 'pong' });
+      return;
     case 'crear': {
       salir(con);
       const codigo = nuevoCodigo();
-      salas.set(codigo, { anfitrion: con, invitado: null });
+      const llave = nuevaLlave();
+      salas.set(codigo, { anfitrion: con, invitado: null, llaves: { anfitrion: llave, invitado: null }, esperas: {} });
       con.sala = codigo;
-      con.enviar({ t: 'sala', codigo });
+      con.rol = 'anfitrion';
+      con.enviar({ t: 'sala', codigo, llave });
       console.log(`[sala ${codigo}] creada`);
       return;
     }
@@ -230,16 +278,45 @@ function alMensaje(con, m) {
       const codigo = String(m.codigo || '').toUpperCase().slice(0, 4);
       const s = salas.get(codigo);
       if (!s) return con.enviar({ t: 'error', msg: 'No existe una sala con ese código. Revisa las letras.' });
-      if (s.anfitrion === con) return con.enviar({ t: 'error', msg: 'Esa es tu propia sala 🙂' });
-      if (s.invitado) return con.enviar({ t: 'error', msg: 'Esa sala ya está llena.' });
+      if (s.anfitrion === con) return con.enviar({ t: 'error', msg: 'Esa es tu propia sala.' });
+      if (s.invitado || s.llaves.invitado) return con.enviar({ t: 'error', msg: 'Esa sala ya está llena.' });
+      if (!s.anfitrion) return con.enviar({ t: 'error', msg: 'Quien creó la sala perdió la conexión. Espera un momento y prueba de nuevo.' });
       salir(con);
+      const llave = nuevaLlave();
       s.invitado = con;
+      s.llaves.invitado = llave;
       con.sala = codigo;
-      con.enviar({ t: 'unido', codigo });
+      con.rol = 'invitado';
+      con.enviar({ t: 'unido', codigo, llave });
       s.anfitrion.enviar({ t: 'rival-entro' });
       console.log(`[sala ${codigo}] se unió el rival`);
       return;
     }
+    case 'volver': {
+      const codigo = String(m.codigo || '').toUpperCase().slice(0, 4);
+      const s = salas.get(codigo);
+      const rol = s && ['anfitrion', 'invitado'].find((r) => s.llaves[r] && s.llaves[r] === m.llave);
+      if (!rol) return con.enviar({ t: 'error', msg: 'La sala ya se cerró.' });
+      const viejo = s[rol];
+      if (viejo && viejo !== con) {
+        // el servidor todavía creía viva la conexión vieja: la reemplazamos
+        viejo.sala = null;
+        viejo.terminar();
+      }
+      clearTimeout(s.esperas[rol]);
+      delete s.esperas[rol];
+      s[rol] = con;
+      con.sala = codigo;
+      con.rol = rol;
+      con.enviar({ t: 'vuelto', rol });
+      const otro = s[otroRol(rol)];
+      if (otro && otro.abierta) otro.enviar({ t: 'rival-volvio' });
+      console.log(`[sala ${codigo}] volvió ${rol}`);
+      return;
+    }
+    case 'salir':
+      salir(con);
+      return;
     default: {
       // cualquier otro mensaje del juego se reenvía al rival
       const otro = rivalDe(con);
@@ -264,7 +341,7 @@ servidor.on('upgrade', (req, socket) => {
   );
   const con = new Conexion(socket);
   con.alRecibir = (m) => alMensaje(con, m);
-  con.alCerrar = () => salir(con);
+  con.alCerrar = () => caer(con);
   conexiones.add(con);
   const quitar = con.alCerrar;
   con.alCerrar = () => {
@@ -273,7 +350,8 @@ servidor.on('upgrade', (req, socket) => {
   };
 });
 
-// Latido: si un jugador no responde en 30 s, se cierra su conexión
+// Latido: si un jugador no responde en unos 10 s, se cierra su conexión
+// (y empieza la espera de reconexión de su sala)
 const conexiones = new Set();
 setInterval(() => {
   for (const con of conexiones) {
@@ -284,7 +362,7 @@ setInterval(() => {
     con.vivo = false;
     try { con.marco(0x9, Buffer.alloc(0)); } catch (e) { con.terminar(); }
   }
-}, 15000).unref();
+}, 5000).unref();
 
 /* ======================= ARRANQUE ======================= */
 servidor.listen(PUERTO, () => {
@@ -293,7 +371,7 @@ servidor.listen(PUERTO, () => {
     for (const r of lista || []) if (r.family === 'IPv4' && !r.internal) ips.push(r.address);
   }
   console.log('');
-  console.log('  ⚽  FingerGol AR listo');
+  console.log('  FingerGol AR listo');
   console.log(`  ➜  En este computador:  http://localhost:${PUERTO}`);
   ips.forEach((ip) => console.log(`  ➜  En tu red Wi-Fi:     http://${ip}:${PUERTO}  (la cámara pide https, mira el README)`));
   console.log('  (Ctrl + C para apagar)');

@@ -26,14 +26,15 @@
     const fondo = F.fondoArco;
     const y1 = (H - F.arco) / 2;
     const y2 = y1 + F.arco;
-    const a = op.transparente ? 0.55 : 1;
+    // con cámara la mesa es casi transparente: te ves a ti mismo y el neón queda encima
+    const a = op.transparente ? C.OPACIDAD_MESA_CAMARA : 1;
     const [c0, c1] = [C.EQUIPOS[0].color, C.EQUIPOS[1].color];
 
     // superficie de la mesa
     ctx.fillStyle = `rgba(21,16,74,${a})`;
     ctx.fillRect(0, 0, W, H);
-    // huequitos por donde sale el aire
-    ctx.fillStyle = `rgba(140,150,255,${0.22 * a + 0.05})`;
+    // huequitos por donde sale el aire (con cámara casi no se ven)
+    ctx.fillStyle = `rgba(140,150,255,${op.transparente ? 0.1 : 0.27})`;
     for (let x = 4; x < W; x += 5) {
       for (let y = 4; y < H; y += 5) {
         ctx.fillRect(x - 0.3, y - 0.3, 0.6, 0.6);
@@ -44,7 +45,7 @@
       ctx.strokeStyle = color;
       ctx.lineWidth = ancho;
       ctx.shadowColor = color;
-      ctx.shadowBlur = brillo;
+      ctx.shadowBlur = op.ahorro ? 0 : brillo;
     };
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
@@ -90,7 +91,7 @@
     [0, 1].forEach((lado) => {
       const color = C.EQUIPOS[lado].color;
       const x0 = lado === 0 ? -fondo : W;
-      ctx.fillStyle = rgba(color, op.transparente ? 0.25 : 0.18);
+      ctx.fillStyle = rgba(color, op.transparente ? 0.3 : 0.18);
       ctx.fillRect(x0, y1, fondo, F.arco);
       neon(color, 0.9, 8);
       ctx.strokeRect(x0, y1, fondo, F.arco);
@@ -99,7 +100,9 @@
   };
 
   class RenderPantalla {
-    constructor(canvas, video) {
+    /** opciones.fijo = true: dibuja en un recuadro propio (el tutorial), no en toda la ventana. */
+    constructor(canvas, video, opciones = {}) {
+      this.fijo = !!opciones.fijo;
       this.c = canvas;
       this.ctx = canvas.getContext('2d');
       this.video = video;
@@ -111,29 +114,36 @@
       this.destello = null;
       this.golpes = [0, 0];   // "rebote" de cada mazo al pegarle al disco (1 → 0)
       this.fuego = null;      // estela de color después de un tiro fuerte
+      this.zoomVideo = 1;     // zona cómoda: el video se acerca para que la mano llegue a todo
+      this.ahorro = false;    // modo ahorro: sin brillos y a resolución normal
+      this.menosMovimiento = false; // sin temblor ni destellos
       this.ajustar();
-      window.addEventListener('resize', () => this.ajustar());
-      window.addEventListener('orientationchange', () => setTimeout(() => this.ajustar(), 250));
+      if (!this.fijo) {
+        window.addEventListener('resize', () => this.ajustar());
+        window.addEventListener('orientationchange', () => setTimeout(() => this.ajustar(), 250));
+      }
     }
 
     ajustar() {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const w = window.innerWidth;
-      const h = window.innerHeight;
+      const dpr = this.ahorro ? 1 : Math.min(window.devicePixelRatio || 1, 2);
+      const w = this.fijo ? this.c.clientWidth || 480 : window.innerWidth;
+      const h = this.fijo ? this.c.clientHeight || 270 : window.innerHeight;
       this.dpr = dpr;
       this.w = w;
       this.h = h;
       this.c.width = Math.round(w * dpr);
       this.c.height = Math.round(h * dpr);
-      this.c.style.width = w + 'px';
-      this.c.style.height = h + 'px';
-      this.rotado = h > w * 1.05;
-      document.body.classList.toggle('vertical', this.rotado);
+      if (!this.fijo) {
+        this.c.style.width = w + 'px';
+        this.c.style.height = h + 'px';
+      }
+      this.rotado = !this.fijo && h > w * 1.05;
+      if (!this.fijo) document.body.classList.toggle('vertical', this.rotado);
 
       const largo = F.ancho + 2 * (F.fondoArco + 2);
       const ancho = F.alto + 4;
-      const arriba = 70; // espacio para el marcador
-      const pad = 10;
+      const arriba = this.fijo ? 6 : 70; // espacio para el marcador
+      const pad = this.fijo ? 6 : 10;
       const areaW = w - pad * 2;
       const areaH = h - arriba - pad;
       let s;
@@ -149,6 +159,18 @@
         oy = arriba + (areaH - F.ancho * s) / 2;
       }
       this.campo = { s, ox, oy };
+      this.campoBase = { s, ox, oy };
+    }
+
+    /** Acerca la vista a un punto de la mesa (como una cámara de video). Solo sin girar. */
+    enfocar(x, y, zoom) {
+      const b = this.campoBase;
+      if (zoom <= 1.001 && Math.abs(x - F.ancho / 2) < 0.5 && Math.abs(y - F.alto / 2) < 0.5) {
+        this.campo = { s: b.s, ox: b.ox, oy: b.oy };
+        return;
+      }
+      const s = b.s * zoom;
+      this.campo = { s, ox: this.w / 2 - x * s, oy: this.h * 0.5 - y * s };
     }
 
     /* ---------- conversiones de coordenadas ---------- */
@@ -162,12 +184,16 @@
       if (!this.rotado) return [(sx - ox) / s, (sy - oy) / s];
       return [F.ancho - (sy - oy) / s, (sx - ox) / s];
     }
-    /** Punto normalizado del video (0..1) -> píxel en pantalla (video en espejo, "cover"). */
+    /**
+     * Punto normalizado del video (0..1) -> píxel en pantalla (video en espejo, "cover").
+     * Con la zona cómoda el video se ve más grande (zoomVideo): el centro de la cámara
+     * cubre toda la pantalla y el mazo sigue justo debajo de tu dedo.
+     */
     videoAPantalla(nx, ny) {
       const v = this.video;
       const vw = v.videoWidth || 1280;
       const vh = v.videoHeight || 720;
-      const esc = Math.max(this.w / vw, this.h / vh);
+      const esc = Math.max(this.w / vw, this.h / vh) * this.zoomVideo;
       const dw = vw * esc;
       const dh = vh * esc;
       const ox = (this.w - dw) / 2;
@@ -175,11 +201,11 @@
       return [ox + (1 - nx) * dw, oy + ny * dh];
     }
 
-    transformCancha(dx = 0, dy = 0) {
+    transformCancha(dx = 0, dy = 0, ctx = this.ctx) {
       const { s, ox, oy } = this.campo;
       const d = this.dpr;
-      if (!this.rotado) this.ctx.setTransform(s * d, 0, 0, s * d, (ox + dx) * d, (oy + dy) * d);
-      else this.ctx.setTransform(0, -s * d, s * d, 0, (ox + dx) * d, (oy + dy + F.ancho * s) * d);
+      if (!this.rotado) ctx.setTransform(s * d, 0, 0, s * d, (ox + dx) * d, (oy + dy) * d);
+      else ctx.setTransform(0, -s * d, s * d, 0, (ox + dx) * d, (oy + dy + F.ancho * s) * d);
     }
     transformPantalla() {
       this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
@@ -259,10 +285,11 @@
       ctx.clearRect(0, 0, this.w, this.h);
 
       if (!op.soloCapas && partido) {
-        const tx = (Math.random() - 0.5) * this.temblor;
-        const ty = (Math.random() - 0.5) * this.temblor;
+        const temblor = this.menosMovimiento ? 0 : this.temblor;
+        const tx = (Math.random() - 0.5) * temblor;
+        const ty = (Math.random() - 0.5) * temblor;
+        this.dibujarMesa(tx, ty);
         this.transformCancha(tx, ty);
-        FG.dibujarCampo(ctx, { transparente: this.conCamara });
         this.dibujarEstela(partido.balon);
         this.dibujarParticulas();
         partido.jugadores.forEach((j) => this.dibujarJugador(j, op));
@@ -275,10 +302,39 @@
       this.transformPantalla();
       this.dibujarTextos(op.proyectar);
 
-      if (this.destello) {
+      if (this.destello && !this.menosMovimiento) {
         ctx.fillStyle = rgba(this.destello.color, Math.max(0, this.destello.vida) * 0.5);
         ctx.fillRect(0, 0, this.w, this.h);
       }
+    }
+
+    /**
+     * La mesa no cambia entre cuadros: se dibuja una vez en un lienzo aparte
+     * (con todos sus brillos de neón, que son lo más pesado) y luego solo se copia.
+     */
+    dibujarMesa(tx, ty) {
+      const ctx = this.ctx;
+      const op = { transparente: this.conCamara, ahorro: this.ahorro };
+      if (this.fijo) {
+        this.transformCancha(tx, ty);
+        FG.dibujarCampo(ctx, op);
+        return;
+      }
+      const { s, ox, oy } = this.campo;
+      const clave = [this.c.width, this.c.height, this.rotado, this.conCamara, this.ahorro, s, ox, oy].join('|');
+      if (clave !== this._claveMesa) {
+        this._claveMesa = clave;
+        if (!this._mesa) this._mesa = document.createElement('canvas');
+        this._mesa.width = this.c.width;
+        this._mesa.height = this.c.height;
+        const m = this._mesa.getContext('2d');
+        m.setTransform(1, 0, 0, 1, 0, 0);
+        m.clearRect(0, 0, this._mesa.width, this._mesa.height);
+        this.transformCancha(0, 0, m);
+        FG.dibujarCampo(m, op);
+      }
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(this._mesa, Math.round(tx * this.dpr), Math.round(ty * this.dpr));
     }
 
     dibujarEstela(b) {
@@ -334,7 +390,7 @@
       ctx.arc(j.x + 0.6, j.y + 1, r, 0, Math.PI * 2);
       ctx.fill();
       ctx.shadowColor = eq.color;
-      ctx.shadowBlur = 10;
+      ctx.shadowBlur = this.ahorro ? 0 : 10;
       ctx.fillStyle = eq.oscuro;
       ctx.beginPath();
       ctx.arc(j.x, j.y, r, 0, Math.PI * 2);
@@ -423,7 +479,7 @@
       ctx.arc(b.x + 0.5, b.y + 0.8, b.r, 0, Math.PI * 2);
       ctx.fill();
       ctx.shadowColor = color;
-      ctx.shadowBlur = 12;
+      ctx.shadowBlur = this.ahorro ? 0 : 12;
       ctx.fillStyle = '#1b1650';
       ctx.beginPath();
       ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
@@ -477,13 +533,46 @@
         // anillo de neón en la punta del índice: ahí está tu mazo
         ctx.strokeStyle = m.color;
         ctx.shadowColor = m.color;
-        ctx.shadowBlur = 12;
+        ctx.shadowBlur = this.ahorro ? 0 : 12;
         ctx.lineWidth = 4;
         ctx.beginPath();
         ctx.arc(punta[0], punta[1], 14, 0, Math.PI * 2);
         ctx.stroke();
         ctx.shadowBlur = 0;
       }
+    }
+
+    /** Anillo que se llena mientras sostienes un gesto (ej. mano abierta = pausa). */
+    dibujarGesto(g) {
+      if (!g || !g.punto) return;
+      const ctx = this.ctx;
+      this.transformPantalla();
+      const [x, y] = g.punto;
+      const r = 34;
+      ctx.lineCap = 'round';
+      ctx.lineWidth = 7;
+      ctx.strokeStyle = 'rgba(13,10,51,0.75)';
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = '#f4ff5a';
+      ctx.shadowColor = '#f4ff5a';
+      ctx.shadowBlur = this.ahorro ? 0 : 10;
+      ctx.beginPath();
+      ctx.arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * g.progreso);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.font = '700 18px "Rajdhani", system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const w = ctx.measureText(g.texto).width + 16;
+      ctx.fillStyle = 'rgba(13,10,51,0.9)';
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x - w / 2, y + r + 8, w, 26, 13);
+      else ctx.rect(x - w / 2, y + r + 8, w, 26);
+      ctx.fill();
+      ctx.fillStyle = '#f4ff5a';
+      ctx.fillText(g.texto, x, y + r + 21);
     }
 
     dibujarTextos(proyectar) {

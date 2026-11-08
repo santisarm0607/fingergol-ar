@@ -1,5 +1,5 @@
 /* ============================================================
-   FingerGol AR — estilos (versión 1.3: "mesa de air hockey neón")
+   FingerGol AR — estilos (versión 1.5: "mesa de air hockey neón")
    Idea: una máquina de air hockey de salón de juegos. La mesa es
    índigo con los huequitos del aire, las líneas son tubos de neón
    (azul celeste para un equipo, fucsia para el otro) y el disco
@@ -66,11 +66,19 @@ kbd {
   height: 100%;
   object-fit: cover;
   transform: scaleX(-1); /* espejo: te ves como en un espejo */
-  filter: brightness(0.75) saturate(0.85);
+  filter: brightness(0.9) saturate(0.9); /* que te veas bien; el neón igual resalta */
   display: none;
 }
 body.con-camara #video { display: block; }
 #lienzo { position: absolute; inset: 0; touch-action: none; }
+
+/* Mesa 3D (AR.js): AR.js pone su propio video detrás de todo (z-index negativo),
+   así que el fondo de la página debe quedar transparente para que se vea. */
+#contenedor-ar { position: absolute; inset: 0; display: none; }
+body.modo-ar #contenedor-ar { display: block; }
+body.modo-ar #escenario { background: transparent; }
+body.modo-ar #lienzo { pointer-events: none; }
+body.modo-ar { background: transparent; }
 
 /* ================= HUD ================= */
 #hud {
@@ -538,6 +546,230 @@ body.vertical .lobby-centro { top: 50%; transform: translate(-50%, -50%); }
 .fin-marcador .c0 { color: var(--azul); text-shadow: 0 0 16px var(--azul); }
 .fin-marcador .c1 { color: var(--rojo); text-shadow: 0 0 16px var(--rojo); }
 
+/* ================= TUTORIAL ("mini video") ================= */
+.btn-tutorial {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin: 0 0 14px;
+  padding: 10px 16px;
+  border-radius: 14px;
+  border: 2px solid #ffffff;
+  background: rgba(13, 10, 51, 0.82);
+  text-align: left;
+  box-shadow: 0 0 18px -8px #ffffff, inset 0 0 18px -12px #ffffff;
+  transition: box-shadow 0.15s, transform 0.1s;
+}
+.btn-tutorial:hover { box-shadow: 0 0 24px -4px #ffffff, inset 0 0 20px -10px #ffffff; }
+.btn-tutorial:active { transform: scale(0.98); }
+.btn-tutorial .play {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  padding-left: 3px;
+  color: var(--mesa-oscura);
+  background: #ffffff;
+  animation: llamar 1.8s ease-out infinite;
+}
+.btn-tutorial .txt { display: flex; flex-direction: column; }
+.btn-tutorial b { font-size: 23px; font-weight: 700; line-height: 1.05; }
+.btn-tutorial small { font-size: 15px; color: var(--sub); }
+@keyframes llamar {
+  0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.55); }
+  70% { box-shadow: 0 0 0 12px rgba(255, 255, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+}
+
+.tarjeta.tutorial { max-width: 600px; padding: 16px; }
+.tut-cabeza { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.tut-etq {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--disco);
+  text-shadow: 0 0 8px rgba(244, 255, 90, 0.5);
+}
+.tut-saltar { margin: 0; font-size: 17px; }
+.tut-video {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 2px solid var(--borde-mesa);
+  background: var(--huecos), var(--mesa-oscura);
+}
+/* con cámara: el fondo es "tu cuarto" visto por la cámara, con tu silueta */
+.tut-video.con-camara {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 90'%3E%3Cdefs%3E%3CradialGradient id='l' cx='50%25' cy='30%25' r='70%25'%3E%3Cstop offset='0' stop-color='%236b5a52'/%3E%3Cstop offset='1' stop-color='%232a2230'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect width='160' height='90' fill='url(%23l)'/%3E%3Crect x='0' y='0' width='26' height='90' fill='%23413743'/%3E%3Crect x='120' y='12' width='28' height='34' rx='2' fill='%23524a5e'/%3E%3Ccircle cx='80' cy='34' r='13' fill='%23392d33'/%3E%3Cpath d='M48 90c0-22 14-34 32-34s32 12 32 34z' fill='%23392d33'/%3E%3C/svg%3E")
+    center / cover no-repeat;
+}
+#tut-lienzo { display: block; width: 100%; aspect-ratio: 16 / 9; cursor: pointer; }
+.tut-play {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 2px solid var(--borde-mesa);
+  background: rgba(13, 10, 51, 0.8);
+  display: grid;
+  place-items: center;
+}
+.tut-play:hover { border-color: var(--disco); color: var(--disco); }
+.tut-barra { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: rgba(255, 255, 255, 0.12); }
+.tut-barra i { display: block; height: 100%; width: 0; background: var(--disco); box-shadow: 0 0 10px var(--disco); }
+.tut-texto { padding: 14px 4px 4px; text-align: center; min-height: 110px; }
+.tut-texto h2 { margin: 0 0 6px; font-size: 30px; }
+.tut-texto p { margin: 0; color: var(--texto); font-size: 19px; line-height: 1.35; }
+.tut-texto .tut-extra { margin-top: 8px; color: var(--sub); font-size: 16px; }
+.tut-pie { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.tut-pie #tut-sig { margin-left: auto; min-width: 150px; }
+.tut-pie #tut-sig.final { background: var(--verde); box-shadow: 0 0 20px -6px var(--verde); }
+.tut-atras { width: 52px; height: 48px; padding: 0 !important; display: grid; place-items: center; }
+.tut-puntos { display: flex; gap: 7px; flex: 1; justify-content: center; }
+.tut-puntos i { width: 10px; height: 10px; border-radius: 50%; background: var(--borde-mesa); transition: width 0.2s, background 0.2s; }
+.tut-puntos i.visto { background: rgba(244, 255, 90, 0.5); }
+.tut-puntos i.activo { width: 26px; border-radius: 99px; background: var(--disco); box-shadow: 0 0 8px var(--disco); }
+@media (max-height: 520px) and (orientation: landscape) {
+  .tarjeta.tutorial {
+    max-width: 860px;
+    display: grid;
+    grid-template-columns: 1.25fr 1fr;
+    column-gap: 16px;
+    align-items: center;
+  }
+  .tut-cabeza { grid-column: 1 / -1; }
+  .tut-video { grid-row: 2 / span 2; }
+  .tut-texto { text-align: left; min-height: 0; }
+  .tut-texto h2 { font-size: 24px; }
+  .tut-texto p { font-size: 16px; }
+  .btn-tutorial { margin-bottom: 10px; padding: 8px 14px; }
+}
+
+/* ================= MESA 3D (AR) ================= */
+.btn-ar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin: 12px 0 0;
+  padding: 10px 16px;
+  border-radius: 14px;
+  border: 2px solid var(--verde);
+  background: rgba(13, 10, 51, 0.82);
+  text-align: left;
+  box-shadow: inset 0 0 18px -12px var(--verde);
+  transition: box-shadow 0.15s, transform 0.1s;
+}
+.btn-ar:hover { box-shadow: 0 0 22px -6px var(--verde), inset 0 0 20px -10px var(--verde); }
+.btn-ar:active { transform: scale(0.98); }
+.btn-ar.deshabilitado { opacity: 0.5; border-style: dashed; }
+.btn-ar .cubo {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--mesa-oscura);
+  background: var(--verde);
+}
+.btn-ar .txt { display: flex; flex-direction: column; }
+.btn-ar b { font-size: 23px; font-weight: 700; line-height: 1.05; }
+.btn-ar small { font-size: 15px; color: var(--sub); }
+
+.tarjeta.ar-prep { max-width: 640px; }
+.ar-cuerpo { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; }
+.marcador { margin: 0; width: 166px; text-align: center; }
+.marcador-falla {
+  width: 166px;
+  min-height: 166px;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  border-radius: 8px;
+  border: 2px dashed var(--verde);
+  font-size: 15px;
+  line-height: 1.3;
+  color: var(--sub);
+}
+.marcador img {
+  display: block;
+  width: 150px;
+  height: 150px;
+  padding: 8px;
+  border-radius: 8px;
+  background: #ffffff;
+  object-fit: contain;
+}
+.marcador figcaption { margin-top: 6px; font-size: 15px; }
+.marcador a { color: var(--verde); }
+.ar-pasos { margin: 0; padding-left: 22px; display: grid; gap: 8px; font-size: 17px; line-height: 1.35; }
+.ar-pasos b { color: var(--texto); }
+.ar-pasos li::marker { color: var(--verde); font-weight: 700; }
+.ar-prep .botones .btn { flex: 1 1 200px; width: auto; }
+@media (max-width: 520px) {
+  .ar-cuerpo { grid-template-columns: 1fr; justify-items: center; }
+  .marcador, .marcador-falla { width: 136px; }
+  .marcador img { width: 120px; height: 120px; }
+  .marcador-falla { min-height: 120px; }
+}
+
+/* ================= GESTOS ================= */
+.lobby-centro .lobby-gesto { color: var(--disco); font-size: 16px; }
+.pista-gesto {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 2px 0 0;
+  font-size: 16px;
+  color: var(--sub);
+}
+body.con-manos .pista-gesto { display: flex; }
+body:not(.con-manos) .lobby-gesto { display: none; }
+.gesto-barra { flex: none; width: 46px; height: 8px; border-radius: 99px; background: rgba(255, 255, 255, 0.15); overflow: hidden; }
+.gesto-barra i { display: block; height: 100%; width: 0; background: var(--disco); box-shadow: 0 0 8px var(--disco); }
+
+/* ================= EN LÍNEA: reconexión ================= */
+#aviso-red {
+  position: fixed;
+  top: 76px;
+  left: 50%;
+  z-index: 45;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 2px solid var(--disco);
+  background: rgba(13, 10, 51, 0.95);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
+}
+#aviso-red b { display: block; font-size: 19px; }
+#aviso-red span { display: block; font-size: 16px; color: var(--sub); }
+.spinner.chico { width: 28px; height: 28px; margin: 0; border-width: 3px; flex: none; }
+
+/* ================= RÉCORDS ================= */
+.fin-record {
+  margin: -6px 0 12px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(244, 255, 90, 0.1);
+  color: var(--disco);
+  font-size: 18px;
+  font-weight: 700;
+}
+
 /* ================= AVISOS ================= */
 #aviso {
   position: fixed;
@@ -575,6 +807,7 @@ body.vertical .lobby-centro { top: 50%; transform: translate(-50%, -50%); }
   pointer-events: none;
 }
 body.en-juego #banner-demo { display: none; }
+body.demo:not(.en-juego) #aviso { bottom: 76px; }
 body.demo #p-inicio { padding-bottom: 60px; }
 
 /* ================= RESPONSIVE ================= */
@@ -590,8 +823,47 @@ body.demo #p-inicio { padding-bottom: 60px; }
   .codigo { font-size: 52px; }
 }
 @media (max-height: 520px) and (orientation: landscape) {
-  .marquesina { margin-bottom: 14px; }
-  .titulo { font-size: 46px; }
+  /* menú con el celular acostado: dos columnas para que todo quepa sin bajar */
+  #p-inicio { align-items: center; padding: 10px 18px; }
+  .arcade {
+    max-width: 920px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    column-gap: 22px;
+    align-items: start;
+    padding: 0;
+  }
+  .marquesina { grid-column: 1; grid-row: 1; margin-bottom: 10px; }
+  .btn-tutorial { grid-column: 1; grid-row: 2; }
+  .btn-ar { grid-column: 1; grid-row: 3; margin: 0; }
+  .como-jugar { display: none; }
+  .modos { grid-column: 2; grid-row: 1 / span 3; gap: 8px; align-self: center; }
+  .ajustes { grid-column: 2; grid-row: 4; margin-top: 8px; }
+  .pie { grid-column: 1; grid-row: 4; margin-top: 10px; align-self: end; text-align: left; font-size: 14px; }
+  .titulo { font-size: 44px; }
+  .lema { font-size: 15px; margin-top: 6px; }
+  .modo { padding: 8px 12px; gap: 12px; }
+  .boton-arcade { width: 30px; height: 30px; }
+  .modo .tit { font-size: 21px; }
+  .modo .sub { font-size: 14px; }
+  .btn-tutorial, .btn-ar { padding: 6px 12px; gap: 10px; }
+  .btn-tutorial .play, .btn-ar .cubo { width: 34px; height: 34px; }
+  .btn-tutorial b, .btn-ar b { font-size: 19px; }
+  .btn-tutorial small, .btn-ar small { font-size: 13px; }
+  .ajustes summary { padding: 8px 2px 6px; }
+  .ajustes-tit { font-size: 18px; }
+  .tarjeta.ar-prep { max-width: 760px; padding: 12px 18px 14px; }
+  .ar-prep .btn-volver { margin-bottom: 4px; }
+  .ar-prep h2 { font-size: 24px; margin-bottom: 6px; }
+  .ar-prep .sub-tarjeta { display: none; }
+  .ar-cuerpo { grid-template-columns: auto 1fr; gap: 14px; }
+  .marcador, .marcador-falla { width: 120px; }
+  .marcador img { width: 120px; height: 120px; }
+  .marcador-falla { min-height: 120px; font-size: 14px; padding: 6px; }
+  .marcador figcaption { font-size: 13px; }
+  .ar-pasos { font-size: 15px; gap: 4px; }
+  .ar-prep .botones { margin-top: 8px; }
+  .ar-prep .btn.grande { font-size: 19px; padding: 8px 16px; }
   .lado .mano-anim { width: 40px; height: 40px; }
   .lado-nombre { font-size: 22px; }
   .lobby-centro { top: 64px; padding: 8px 14px; }
@@ -601,3 +873,7 @@ body.demo #p-inicio { padding-bottom: 60px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition: none !important; }
 }
+/* lo mismo cuando eliges "Movimiento: Reducido" en Ajustes */
+body.menos-movimiento *,
+body.menos-movimiento *::before,
+body.menos-movimiento *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition: none !important; }
